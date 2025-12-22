@@ -3,4 +3,4 @@ z3/
 kmax/
 kernel/
 syzkaller/
-/superc
+__pycache__/
