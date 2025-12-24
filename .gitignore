@@ -2,5 +2,7 @@ superc/
 z3/
 kmax/
 kernel/
+!src/kernel/
 syzkaller/
 __pycache__/
+.env

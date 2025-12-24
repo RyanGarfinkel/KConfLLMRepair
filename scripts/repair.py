@@ -1,8 +1,14 @@
 
 from kernel import kernel_src, checkout, fetch_kernel_code_changes, kernel_repo
+from src.llm.prompt import get_prompt
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
 import subprocess
 import click
 import os
+
+load_dotenv()
 
 superc_linux_script_path = '/usr/local/bin/superc-linux'
 
@@ -11,6 +17,9 @@ os.makedirs(base_config_dir, exist_ok=True)
 
 klocalizer_config_dir = '/workspace/data/klocalizer_configs'
 os.makedirs(klocalizer_config_dir, exist_ok=True)
+
+client = genai.Client()
+model = 'gemini-2.5-flash'
 
 def make_defconfig(commit_hash):
 
@@ -53,6 +62,49 @@ def klocalizer_repair(commit_hash, patch_path):
     print('KLocalizer repair completed.')
 
     return config_path
+
+def get_delta_config(base_config_path, klocalizer_config_path):
+    print('Generating delta config...')
+    
+    result = subprocess.run(['diff', '-u', base_config_path, klocalizer_config_path], capture_output=True, text=True)
+    if result.returncode not in [0, 1]:
+        raise Exception('Failed to generate delta config')
+    
+    # Parse diff to extract only changed CONFIG lines
+    added = []
+    removed = []
+    for line in result.stdout.splitlines():
+        if line.startswith('+') and 'CONFIG_' in line:
+            added.append(line[1:].strip())
+        elif line.startswith('-') and 'CONFIG_' in line:
+            removed.append(line[1:].strip())
+    
+    # Format as a simple summary
+    delta_summary = f"Added options ({len(added)}):\n" + "\n".join(added) + f"\n\nRemoved options ({len(removed)}):\n" + "\n".join(removed)
+    
+    print('Delta config generated (concise).')
+    return delta_summary
+
+def llm_repair(base_config_path, klocalizer_config_path):
+    
+    print('Calculating delta config for LLM repair...')
+
+    delta_config = get_delta_config(base_config_path, klocalizer_config_path)
+    prompt = get_prompt(delta_config)
+
+    print('Starting LLM repair...')
+    
+    response = client.models.generate_content(
+        model=model,
+        contents=prompt,
+        config = types.GenerateContentConfig(
+            max_output_tokens=8192,
+        ),
+    )
+
+    print('LLM repair completed.')
+
+    return response.text
 
 def fetch_base_klocalizer_configs(commit):
 

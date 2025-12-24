@@ -17,7 +17,7 @@ git clone https://github.com/paulgazz/kmax.git
 git clone git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git kernel
 
 # Syzkaller
-git clone https://github.com/google/syzkaller.git
+# git clone https://github.com/google/syzkaller.git
 
 echo "Cloning completed."
 
