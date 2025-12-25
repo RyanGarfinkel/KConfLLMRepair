@@ -40,10 +40,5 @@ docker build -t kconf-llm-repair .
 
 ### 2. Run Docker Container
 ```bash
-docker run --rm -it \
-    -v $(pwd):/app \
-    -w /app \
-    --user syzkaller \
-    kconf-llm-repair \
-    /bin/bash
+docker run -v "$(pwd):/workspace" -it kconf-llm-repair
 ```
