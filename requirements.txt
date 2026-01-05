@@ -2,3 +2,7 @@ GitPython
 click
 dotenv
 google-genai
+langchain
+langchain-google-genai
+singleton-decorator
+pandas
