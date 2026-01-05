@@ -21,11 +21,11 @@ os.makedirs(klocalizer_config_dir, exist_ok=True)
 client = genai.Client()
 model = 'gemini-2.5-flash'
 
-def make_defconfig(commit_hash):
+def make_defconfig(commit_hash, arch='x86_64'):
 
-    print('Making defconfig for x86_64 architecture...')
+    print(f'Making defconfig for {arch} architecture...')
 
-    result = subprocess.run(['make', 'ARCH=x86', 'CROSS_COMPILE=x86_64-linux-gnu-', 'olddefconfig'], cwd=kernel_src)
+    result = subprocess.run(['make', f'ARCH={arch}', 'CROSS_COMPILE=x86_64-linux-gnu-', 'olddefconfig'], cwd=kernel_src)
     if result.returncode != 0:
         raise Exception('Failed to make olddefconfig')
     

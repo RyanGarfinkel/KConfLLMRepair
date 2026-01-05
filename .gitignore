@@ -5,4 +5,5 @@ kernel/
 !src/kernel/
 syzkaller/
 __pycache__/
+debian.raw
 .env

@@ -1,26 +1,37 @@
 from src.config import kernel_src, klocalizer_config_dir, superc_linux_script_path
+from src.utils.log import log_info, log_error, log_success
+from singleton_decorator import singleton
+from src.kernel.kconfig import KConfig
 import subprocess
 
-def repair(commit_hash, patch_path):
-    
-    config_path = f'{klocalizer_config_dir}/{commit_hash}.config'
+@singleton
+class KLocalizer():
 
-    print('Running klocalizer repair...')
+    def __init__(self):
 
-    cmd = f'klocalizer \
-        --superc-linux-script {superc_linux_script_path} \
-        --include-mutex {patch_path} \
-        --cross-compiler gcc \
-        --arch x86_64'
-    
-    result = subprocess.run(cmd, shell=True, check=True, cwd=kernel_src)
-    if result.returncode != 0:
-        raise Exception(f'klocalizer repair failed: {result.stderr}')
+        self.klocalizer_path = '/home/dev/.local/bin/klocalizer'
+        self.superc_path = '/home/dev/.local/bin/superc_linux.sh'
 
-    result = subprocess.run(['cp', f'{kernel_src}/0-x86_64.config', config_path], check=True)
-    if result.returncode != 0:
-        raise Exception('Failed to copy klocalizer config file')
-    
-    print('klocalizer repair completed.')
+    def repair(self, patch, define=[], undefine=[], arch='x86_64'):
 
-    return config_path
+        log_info('Starting klocalizer repair...')
+
+        define_opts = ' '.join([f'--define {opt}' for opt in define]) if define else ''
+        undefine_opts = ' '.join([f'--undefine {opt}' for opt in undefine]) if undefine else ''
+
+        cmd = f'{self.klocalizer_path} \
+            --superc-linux-script {self.superc_path} \
+            --include-mutex {patch} \
+            --cross-compiler gcc \
+            --arch {arch} \
+            {define_opts} \
+            {undefine_opts}'
+
+        result = subprocess.run(cmd, shell=True, check=True, cwd=kernel_src)
+        if result.returncode != 0:
+            log_error(f'klocalizer repair failed: {result.stderr}')
+            return None
+        
+        log_success('klocalizer repair completed.')
+
+        return KConfig(f'{kernel_src}/0-{arch}.config')

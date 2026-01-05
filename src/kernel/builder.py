@@ -1,38 +1,76 @@
-
-from src.config import kernel_src, base_config_dir
+from src.utils.log import log_info, log_success, log_error
+from src.kernel.repository import KernelRepo
+from singleton_decorator import singleton
+from src.kernel.kconfig import KConfig
+from src.config import kernel_src
 import subprocess
-import os
 
-def make_defconfig(commit_hash):
+_BZIMAGE_PATH = 'arch/x86/boot/bzImage'
 
-    print('Making defconfig for x86_64 architecture...')
+@singleton
+class Builder:
 
-    result = subprocess.run('make ARCH=x86 CROSS_COMPILE=x86_64-linux-gnu- defconfig', shell=True, cwd=kernel_src)
-    if result.returncode != 0:
-        raise Exception('Failed to make defconfig')
+    def __init__(self):
+        self.repo = KernelRepo()
+        self._KVM_CONFIG = '/kernel/configs/kvm_guest.config'
+
+    def build_patch(self, output_path):
+
+        log_info('Fetching kernel patch...')
+
+        commits = self.repo.get_commit_window()
+
+        start = commits[-1]
+        end = commits[0]
+
+        diff = self.repo.diff(start, end)
+
+        with open(output_path, 'w') as f:
+            f.write(diff)
+
+        log_success(f'Kernel patch saved to {output_path}.')
+
+        return start, end
+
+    def merge_with_kvm_config(self, syzkaller_config):
+
+        log_info('Merging syzkaller config with KVM guest config...')
+
+        cmd = [
+            'scripts/kconfig/merge_config.sh',
+            '-m',
+            syzkaller_config,
+            self._KVM_CONFIG,
+        ]
+
+        with open(f'{kernel_src}/{syzkaller_config}', 'w') as out_file:
+            subprocess.run(cmd, stdout=out_file, check=True, cwd=kernel_src)
+
+        return True
+
+    def _make_olddefconfig(self, arch='x86_64') -> bool:
+        
+        log_info('Generating olddefconfig...')
+
+        result = subprocess.run(f'make olddefconfig ARCH={arch} CROSS_COMPILE={arch}-linux-gnu-', shell=True, check=True, cwd=kernel_src)
+        if result.returncode != 0:
+            log_error('Failed to generate olddefconfig.')
+            return False
+        
+        log_success('olddefconfig generated successfully.')
+
+        return True
     
-    config_path = f'{kernel_src}/.config'
+    def build_kernel(self, arch='x86_64'):
 
-    result = subprocess.run(f'cp {kernel_src}/.config {base_config_dir}/{commit_hash}.config', shell=True, check=True)
-    if result.returncode != 0:
-        raise Exception('Failed to copy base config file')
+        self._make_olddefconfig()
 
-    print('Defconfig created.')
+        log_info('Building the kernel...')
 
-    return config_path
+        result = subprocess.run(f'make -j4 LD=ld.lld ARCH={arch} CROSS_COMPILE={arch}-linux-gnu- bzImage', shell=True, check=True, cwd=kernel_src)
+        if result.returncode != 0:
+            raise Exception('Kernel build failed.')
+        
+        log_success('Kernel built successfully.')
 
-def build_kernel():
-
-    print('Building the kernel...')
-
-    os.chdir(kernel_src)
-
-    result = subprocess.run(f'make ARCH=x86 CROSS_COMPILE=x86_64-linux-gnu- -j$(nproc)', shell=True, check=True)
-    if result.returncode != 0:
-        raise Exception('Kernel build failed.')
-    
-    os.chdir('/workspace')
-
-    print('Kernel built successfully.')
-
-    return f'{kernel_src}/arch/x86/boot/bzImage' 
+        return _BZIMAGE_PATH
