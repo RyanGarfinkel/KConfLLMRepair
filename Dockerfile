@@ -2,101 +2,78 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Update and Dependencies
+# Install dependencies
 RUN apt-get update && apt-get install -y \
-    build-essential \
-    python3 \
-    python3-venv \
-    python3-pip \
-    python3-dev \
+    python3 python3-dev python3-pip pipx \
+    gcc build-essential make \
+    flex bison bc \
+    libssl-dev libelf-dev \
+    git wget unzip xz-utils lftp \
     openjdk-8-jdk \
-    gcc \
-    git \
-    flex \
-    bison \
-    bc \
-    libssl-dev \
-    libelf-dev \
-    wget \
-    unzip \
-    xz-utils \
-    lftp \
-    libjson-java \
-    sat4j \
     qemu-system-x86 \
-    qemu-system-arm \
-    qemu-system-aarch64 \
-    gcc-x86-64-linux-gnu && \
+    clang-15 llvm-15 lld-15 dwarves \
+    libz3-java libjson-java sat4j lz4 zstd libdw-dev \
+    gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu && \
+    update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && \
+    update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100 && \
     rm -rf /var/lib/apt/lists/*
 
-# Go Setup
-RUN wget https://dl.google.com/go/go1.23.6.linux-arm64.tar.gz && \
-    tar -xf go1.23.6.linux-arm64.tar.gz && \
-    rm go1.23.6.linux-arm64.tar.gz && \
+# Go installation
+RUN ARCH=$(dpkg --print-architecture) && \
+    wget https://dl.google.com/go/go1.24.4.linux-${ARCH}.tar.gz && \
+    tar -xf go1.24.4.linux-${ARCH}.tar.gz && \
+    rm go1.24.4.linux-${ARCH}.tar.gz && \
     mv go /usr/local/go
 
 ENV GOROOT=/usr/local/go
 ENV PATH=$PATH:$GOROOT/bin
 
-# Z3 Setup
-WORKDIR /tmp
-COPY z3 /tmp/z3
-RUN cd z3 && \
-    python3 scripts/mk_make.py --java && \
-    cd build && \
-    make -j$(nproc)
+# Dev user setup
+RUN useradd -m dev
 
-RUN cp /tmp/z3/build/libz3.so /usr/lib/ && \
-    cp /tmp/z3/build/libz3java.so /usr/lib/ && \
-    cp /tmp/z3/build/com.microsoft.z3.jar /usr/share/java/ && \
-    rm -rf /tmp/z3
+USER dev
 
-ENV LD_LIBRARY_PATH=/usr/lib
+# Env variables & copies directories
+ENV HOME=/home/dev \
+    PATH=/home/dev/.local/bin:$PATH \
+    DEBIAN_IMG_SRC=/home/dev/opt/debian.raw \
+    KERNEL_SRC=/home/dev/opt/kernel \
+    SYZKALLER_SRC=/home/dev/opt/syzkaller \
+    Z3_SRC=/home/dev/opt/z3
 
-# SuperC Setup
-WORKDIR /opt
-COPY superc /opt/superc
+WORKDIR $HOME/opt
+COPY --chown=dev:dev debian.raw $DEBIAN_IMG_SRC
+COPY --chown=dev:dev kernel $KERNEL_SRC
+COPY --chown=dev:dev syzkaller $SYZKALLER_SRC
+COPY --chown=dev:dev z3 $Z3_SRC
 
-ENV JAVA_DEV_ROOT=/opt/superc
-ENV CLASSPATH=$CLASSPATH:$JAVA_DEV_ROOT/classes:$JAVA_DEV_ROOT/bin/superc.jar:$JAVA_DEV_ROOT/bin/xtc.jar:$JAVA_DEV_ROOT/bin/junit.jar:$JAVA_DEV_ROOT/bin/antlr.jar:$JAVA_DEV_ROOT/bin/javabdd.jar:$JAVA_DEV_ROOT/bin/json-simple-1.1.1.jar:/usr/share/java/org.sat4j.core.jar:/usr/share/java/com.microsoft.z3.jar:/usr/share/java/json-lib.jar
-ENV JAVA_ARGS="-Xms2048m -Xmx4048m -Xss128m"
+RUN git config --global --add safe.directory /home/dev/opt/kernel && \
+    git config --global --add safe.directory /home/dev/opt/syzkaller
 
-RUN cd superc && make configure && make
+# Syzkaller installation
+WORKDIR $SYZKALLER_SRC
+RUN make
 
-RUN cat <<'EOF' > /usr/local/bin/superc-linux
-#!/bin/sh
-exec java $JAVA_ARGS -cp "$CLASSPATH" superc.SuperC "$@"
-EOF
-RUN chmod +x /usr/local/bin/superc-linux && ln -s /usr/local/bin/superc-linux /usr/local/bin/superc
+ENV PATH=$SYZKALLER_SRC/bin:$PATH
 
-# KMax Setup
+# Z3 installation
+WORKDIR $Z3_SRC
+RUN python3 scripts/mk_make.py --java
+WORKDIR $Z3_SRC/build
+RUN make -j4$(nproc)
+
+ENV CLASSPATH=/usr/share/java/org.sat4j.core.jar:/usr/share/java/json.jar:$Z3_SRC/build/com.microsoft.z3.jar:$CLASSPATH
+ENV LD_LIBRARY_PATH=$Z3_SRC/build:$LD_LIBRARY_PATH
+
+# SuperC installation
+RUN wget -O - https://raw.githubusercontent.com/appleseedlab/superc/master/scripts/install.sh | bash
+ENV CLASSPATH=$HOME/.local/share/superc/superc.jar:$HOME/.local/share/superc/xtc.jar:$HOME/.local/share/superc/JavaBDD/javabdd-1.0b2.jar:/usr/share/java/org.sat4j.core.jar:/usr/share/java/json.jar:$Z3_SRC/build/com.microsoft.z3.jar:$CLASSPATH
+
+# Python tools installation
 WORKDIR /workspace
-COPY kmax /workspace/kmax
-RUN python3 -m venv /opt/kmax_env && \
-    . /opt/kmax_env/bin/activate && \
-    pip install --upgrade pip && \
-    pip install ./kmax
-
-RUN echo 'source /opt/kmax_env/bin/activate' >> /root/.bashrc
-
-ENV COMPILER_INSTALL_PATH=$HOME/0day
-ENV PATH=$HOME/.local/bin/:$PATH
-
-WORKDIR /workspace
-
-# Syzkaller Setup
-WORKDIR /opt
-COPY syzkaller /opt/syzkaller
-RUN cd /opt/syzkaller && \
-    make ARCH=arm64
-
-# Debian Image
-WORKDIR /opt
-RUN wget https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-arm64.raw
-
-# Run
-WORKDIR /workspace
-COPY requirements.txt /opt/requirements.txt
-RUN pip install -r /opt/requirements.txt
+COPY requirements.txt /workspace/requirements.txt
+RUN pipx install kmax && \
+    python3 -m pip install --upgrade pip && \
+    python3 -m pip install -r requirements.txt
 
 CMD ["/bin/bash"]
