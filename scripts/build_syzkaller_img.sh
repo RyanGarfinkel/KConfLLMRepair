@@ -11,12 +11,16 @@ sudo apt-get install -y debootstrap
 cd $SYZKALLER_SRC/tools
 sudo ./create-image.sh
 
-sudo chown $USER:$USER trixie.img
+mv bullseye.img ~/bullseye.img
 
-echo 'export TRIXIE_IMG=$SYZKALLER_SRC/tools/trixie.img' >> ~/.bashrc
-export TRIXIE_IMG=$SYZKALLER_SRC/tools/trixie.img
+sudo chown $USER:$USER ~/bullseye.img
 
-echo "Syzkaller image built successfully at $TRIXIE_IMG"
-echo""
+sudo rm -rf bullseye
+
+echo 'export BULLSEYE_IMG=~/bullseye.img' >> ~/.bashrc
+export BULLSEYE_IMG=~/bullseye.img
+
+echo "Syzkaller image built successfully at $BULLSEYE_IMG"
+echo ""
 echo "Run the following command to run the kmax tools:"
 echo "source ~/.bashrc"

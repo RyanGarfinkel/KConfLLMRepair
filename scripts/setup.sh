@@ -28,7 +28,7 @@ sudo apt-get install -y \
      python3 python3-dev python3-pip pipx \
      git wget unzip xz-utils lftp \
      openjdk-8-jdk libz3-java libjson-java sat4j \
-     qemu-system-x86 libdw-dev \
+     qemu-system-x86 libdw-dev ccache \
      clang-15 llvm-15 lld-15 \
      gcc-x86-64-linux-gnu
 

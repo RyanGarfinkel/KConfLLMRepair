@@ -53,7 +53,7 @@ class Builder:
 
         log_info('Building the kernel...')
 
-        result = subprocess.run(f'make -j$(nproc) LD=ld.lld ARCH={arch} CROSS_COMPILE={arch}-linux-gnu- bzImage', shell=True, check=True, cwd=kernel_src)
+        result = subprocess.run(f'make -j$(nproc) LD=ld.lld ARCH={arch} CROSS_COMPILE="ccache {arch}-linux-gnu-" bzImage', shell=True, check=True, cwd=kernel_src)
         if result.returncode != 0:
             raise Exception('Kernel build failed.')
         

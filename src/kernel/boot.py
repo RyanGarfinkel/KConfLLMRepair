@@ -19,14 +19,17 @@ class KernelBooter:
 
         cmd = [
             f'qemu-system-{arch}',
-            '-m', '1G',
+            '-m', '2G',
             '-smp', '2',
             '-kernel', bzimage_path,
-            '-append', 'console=ttyS0 earlyprintk=serial,ttyS0 root=/dev/sda1 rw net.ifnames=0',
-            '-drive', f'file={debian_img},format=raw',
+            '-append', 'console=ttyS0 earlyprintk=serial,ttyS0 root=/dev/vda1 rw net.ifnames=0',
+            '-drive', f'file={debian_img},format=raw,if=virtio',
             '-net', 'user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22',
-            '-net', 'nic,model=e1000',
-            '-nographic'
+            '-net', 'nic,model=virtio',
+            '-nographic',
+            '-pidfile', 'vm.pid',
+            '-enable-kvm',
+            '-cpu', 'host'
         ]
         
         log_info(f'Starting QEMU boot... Logs: {log_file}')

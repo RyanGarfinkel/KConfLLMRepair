@@ -21,7 +21,7 @@ def generate_single_baseline(dir):
     builder = Builder()
     repo = KernelRepo()
 
-    img_path = os.getenv('TRIXIE_IMG')
+    img_path = os.getenv('BULLSEYE_IMG')
 
     log_info('Cleaning kernel repository...')
     repo.clean()
