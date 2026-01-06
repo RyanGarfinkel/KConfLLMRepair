@@ -1,4 +1,4 @@
-from src.config import qemu_log_dir, kernel_src
+from src.config import kernel_src
 from src.utils.log import log_info, log_error, log_success
 from singleton_decorator import singleton
 import subprocess

@@ -1,4 +1,4 @@
-from src.config import kernel_src, klocalizer_config_dir, superc_linux_script_path
+from src.config import kernel_src, superc_linux_script_path
 from src.utils.log import log_info, log_error, log_success
 from singleton_decorator import singleton
 from src.kernel.kconfig import KConfig
@@ -9,8 +9,8 @@ class KLocalizer():
 
     def __init__(self):
 
-        self.klocalizer_path = '/home/dev/.local/bin/klocalizer'
-        self.superc_path = '/home/dev/.local/bin/superc_linux.sh'
+        self.klocalizer_path = '/home/ubuntu/.local/bin/klocalizer'
+        self.superc_path = '/home/ubuntu/.local/bin/superc_linux.sh'
 
     def repair(self, patch, define=[], undefine=[], arch='x86_64'):
 

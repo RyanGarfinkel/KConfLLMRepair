@@ -13,7 +13,7 @@ class Builder:
 
     def __init__(self):
         self.repo = KernelRepo()
-        self._SYZKALLER_PATH = '/home/dev/opt/syzkaller'
+        self._SYZKALLER_PATH = '/home/ubuntu/syzkaller'
         self._KVM_CONFIG = 'kernel/configs/kvm_guest.config'
 
     def build_patch(self, output_path):
@@ -53,23 +53,10 @@ class Builder:
 
         log_info('Building the kernel...')
 
-        result = subprocess.run(f'make -j4 LD=ld.lld ARCH={arch} CROSS_COMPILE={arch}-linux-gnu- bzImage', shell=True, check=True, cwd=kernel_src)
+        result = subprocess.run(f'make -j$(nproc) LD=ld.lld ARCH={arch} CROSS_COMPILE={arch}-linux-gnu- bzImage', shell=True, check=True, cwd=kernel_src)
         if result.returncode != 0:
             raise Exception('Kernel build failed.')
         
         log_success('Kernel built successfully.')
 
         return _BZIMAGE_PATH
-
-    def build_image(self):
-
-        # log_info('Building Debian Image...')
-
-        # subprocess.run(f'{self._SYZKALLER_PATH}/tools/create_debian_image.sh', shell=True, check=True)
-
-        # log_success('Debian image built successfully.')
-
-        # if not os.path.exists(f'{self._SYZKALLER_PATH}/tools/bullseye.img'):
-        #     raise Exception('Failed to build Debian image.')
-        
-        return f'{self._SYZKALLER_PATH}/tools/bullseye.img'

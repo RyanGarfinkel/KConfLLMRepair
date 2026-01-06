@@ -1,10 +1,11 @@
 import sys
-sys.path.insert(0, '/workspace')
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from src.core.pipeline import generate_single_baseline
 from src.utils.log import log_info
 import pandas as pd
-import os
 
 sample_size = 1 # 50
 
@@ -13,7 +14,7 @@ cols = ['commit_start', 'commit_end', 'patch_path',
         'klocalizer_config', 'klocalizer_booted', 'klocalizer_qemu_log']
 data = []
 
-baseline_dir = '/workspace/data/baselines'
+baseline_dir = os.path.expanduser('~/KConfLLMRepair/data/baselines')
 os.makedirs(baseline_dir, exist_ok=True)
 
 for i in range(sample_size):

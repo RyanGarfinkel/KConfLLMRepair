@@ -6,7 +6,7 @@ from git import Repo, Commit
 import subprocess
 import os
 
-_PATH = '/home/dev/opt/syzkaller'
+_PATH = os.path.expandvars('$SYZKALLER_SRC')
 if not os.path.exists(_PATH):
     raise FileNotFoundError(f'Syzkaller path not found at {_PATH}')
 

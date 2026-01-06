@@ -5,7 +5,10 @@ import os
 load_dotenv()
 
 # Kernel
-kernel_src = '/home/dev/opt/kernel'
+kernel_src = os.path.expandvars('$KERNEL_SRC')
+if not os.path.exists(kernel_src):
+    raise FileNotFoundError(f'Kernel source path not found at {kernel_src}')
+
 kernel_repo = Repo(kernel_src)
 
 # SuperC
@@ -18,18 +21,7 @@ qemu_log_dir = '/workspace/logs/qemu'
 
 # Syzkaller
 syzkaller_yml_path = '/home/dev/opt/syzkaller/dashboard/config/linux/main.yml'
-if not os.path.exists(syzkaller_yml_path):
-    raise FileNotFoundError(f'Syzkaller config file not found at {syzkaller_yml_path}')
+# if not os.path.exists(syzkaller_yml_path):
+#     raise FileNotFoundError(f'Syzkaller config file not found at {syzkaller_yml_path}')
 
 syzkaller_output_path = '/home/dev/opt/syzkaller/dashboard/config/linux/upstream-apparmor-kasan.config'
-
-# Data
-patches_dir = '/workspace/data/patches'
-
-base_config_dir = '/workspace/data/base_configs'
-
-klocalizer_config_dir = '/workspace/data/klocalizer_configs'
-
-delta_config_dir = '/workspace/data/delta_configs'
-
-llm_config_dir = '/workspace/data/llm_configs'
