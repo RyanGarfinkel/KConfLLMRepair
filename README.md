@@ -16,8 +16,17 @@ docker run --rm -it --privileged \
 
 ## Getting started
 Run the following inside the Docker container from the ```/workspace``` directory:
-### 1. Baseline configurations
+
+### 1. Setting up the .env file
+Create an```.env``` file in the ```/workspace``` directory for you Google Gemini API key. Then fill in the following information:
+
+```env
+GOOGLE_API_KEY=your-api-key-here
+```
+
+### 2. Baseline configurations
 ```bash
+cd /workspace
 python3 scripts/generate_baselines.py
 ```
 The generate_baselines script will produce ```n``` base configurations and inital klocalizer repaired configurations. The following file structure will be created:
@@ -40,6 +49,6 @@ data/baselines/
 │   └── klocalizer_qemu.log
 ```
 
-### 2. LLM Repair
+### 3. LLM Repair
 ```bash
 ```

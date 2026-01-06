@@ -20,27 +20,43 @@ if not os.path.exists(_MAIN_YML_PATH):
 
 _BUILD_PATH = f'{_SYZ_KONF}/syz-kconf'
 
-_CONFIG_PATH = f'{_PATH}/dashboard/config/linux/upstream-apparmor-kasan.config'
-
-_REPO = Repo(_PATH)
-
 @singleton
 class Syzkaller:
 
     def __init__(self):
         self._build_path = None
+        self._REPO = Repo(_PATH)
+        self._CONFIG_PATH = f'{_PATH}/dashboard/config/linux/upstream-apparmor-kasan.config'
+        self._KVM_CONFIG = f'{kernel_src}/kernel/configs/kvm_guest.config'
 
     def _get_version(self, kernel_commit: Commit) -> Commit:
 
         kernel_commit_date = kernel_commit.committed_datetime
 
         try:
-            commit = next(_REPO.iter_commits(until=kernel_commit_date))
+            commit = next(self._REPO.iter_commits(until=kernel_commit_date))
             return commit
         except StopIteration:
             log_error('Failed to find syzkaller version for given kernel commit.')
             return None
-        
+    
+    def _merge_with_kvm_config(self):
+
+        log_info('Merging syzkaller config with KVM guest config...')
+
+        cmd = [
+            'scripts/kconfig/merge_config.sh',
+            '-m',
+            self._CONFIG_PATH,
+            self._KVM_CONFIG,
+        ]
+
+        subprocess.run(cmd, check=True, cwd=kernel_src)
+
+        log_success('Config merged with KVM guest config successfully.')
+
+        return True
+    
     def build_for(self, kernel_commit: Commit) -> bool:
 
         syz_commit = self._get_version(kernel_commit)
@@ -50,9 +66,9 @@ class Syzkaller:
         
         log_info(f'Building syzkaller version {syz_commit.hexsha}')
 
-        _REPO.git.reset('--hard')
-        _REPO.git.clean('-fdx')
-        _REPO.git.checkout(syz_commit.hexsha)
+        self._REPO.git.reset('--hard')
+        self._REPO.git.clean('-fdx')
+        self._REPO.git.checkout(syz_commit.hexsha)
 
         result = subprocess.run('go build', cwd=_SYZ_KONF, shell=True, check=True)
         if result.returncode != 0:
@@ -82,30 +98,32 @@ class Syzkaller:
         ]
 
         try:
-            result = subprocess.run(
-                cmd, 
-                cwd=kernel_src, 
-                check=True,
-                text=True,
-                capture_output=True
-            )
+            subprocess.run(cmd, cwd=kernel_src, check=True)
 
         except subprocess.CalledProcessError as e:
-            print("=== FULL ERROR ===")
-            print(f"Return code: {e.returncode}")
-            print(f"Command: {e.cmd}")
-            print("=== STDOUT ===")
-            print(e.stdout)
-            print("=== STDERR ===")
-            print(e.stderr)
-            print("==================")
-            log_error(f'Failed to generate syzkaller config: {str(e)[:200]}')  # Truncate log_error
+
+            log_error(f'Failed to generate syzkaller config.')
+            log_error(f'Command: {e.cmd}')
+            log_error(f'Return code: {e.returncode}')
+            log_error(f'stdout: {e.stdout}')
+            log_error(f'stderr: {e.stderr}')
+            log_error(str(e))
             return None
         
-        if not os.path.exists(_CONFIG_PATH):
+        if not os.path.exists(self._CONFIG_PATH):
             log_error('Failed to generate syzkaller config file.')
             return None
+        
+        log_success(f'Successfully generated syzkaller config.')
+        
+        self._merge_with_kvm_config()
 
-        log_success(f'Successfully generated syzkaller config at {_CONFIG_PATH}')
+        dest_path = f'{kernel_src}/.config'
 
-        return KConfig(_CONFIG_PATH)
+        if not os.path.exists(dest_path):
+            log_error(f'Failed to get merge base config.')
+            return None
+
+        log_success(f'Successfully generated base config')
+
+        return KConfig(dest_path)

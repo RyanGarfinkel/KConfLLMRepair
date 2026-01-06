@@ -5,6 +5,7 @@
 # import json
 import os
 
+from src.kernel.kconfig import KConfig
 from src.kernel.repository import KernelRepo
 from src.tools.syzkaller import Syzkaller
 from src.tools.klocalizer import KLocalizer
@@ -98,21 +99,16 @@ def generate_single_baseline(dir):
     if base_config is None:
         print('Failed to generate base syzkaller config. Aborting sample generation.')
         return res
-    
-    print('here 1:', base_config.path)
-    base_config.cp(f'{kernel_src}/.config')
-    print('here 2:', base_config.path)
-    builder.merge_with_kvm_config(base_config.path)
-    base_config.refresh()
 
     base_config.cp(f'{dir}/base.config')
     res.append(f'{dir}/base.config')
 
     # Test Base Config in QEMU
     booter = KernelBooter()
+    debian_img = builder.build_image()
     bz_image = builder.build_kernel()
 
-    booted = booter.boot(bz_image, f'{dir}/base_qemu.log')
+    booted = booter.boot(debian_img, bz_image, f'{dir}/base_qemu.log')
     if not booted:
         print('Base config failed to boot in QEMU. Aborting sample generation.')
     else:

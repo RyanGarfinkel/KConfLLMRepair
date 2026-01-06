@@ -1,4 +1,4 @@
-from src.config import debian_img_path, qemu_log_dir, kernel_src
+from src.config import qemu_log_dir, kernel_src
 from src.utils.log import log_info, log_error, log_success
 from singleton_decorator import singleton
 import subprocess
@@ -12,7 +12,7 @@ _TIMEOUT = 300
 @singleton
 class KernelBooter:
     
-    def boot(self, bzimage_path, log_file, arch='x86_64'):
+    def boot(self, debian_img, bzimage_path, log_file, arch='x86_64'):
 
         if not os.path.isabs(bzimage_path) and not bzimage_path.startswith(kernel_src):
              bzimage_path = os.path.join(kernel_src, bzimage_path)
@@ -22,17 +22,20 @@ class KernelBooter:
             '-m', '1G',
             '-smp', '2',
             '-kernel', bzimage_path,
-            '-append', '"console=ttyS0 earlyprintk=serial,ttyS0 root=/dev/sda1 rw net.ifnames=0"',
-            '-drive', f'file={debian_img_path},format=raw',
+            '-append', 'console=ttyS0 earlyprintk=serial,ttyS0 root=/dev/sda1 rw net.ifnames=0',
+            '-drive', f'file={debian_img},format=raw',
             '-net', 'user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22',
             '-net', 'nic,model=e1000',
             '-nographic'
         ]
         
         log_info(f'Starting QEMU boot... Logs: {log_file}')
+        log_info(f'Will wait up to {_TIMEOUT} seconds for boot to complete.')
 
         start_time = time.time()
         success = False
+
+        log_info(f'Approximate endtime is {time.ctime(start_time + _TIMEOUT)}')
 
         with open(log_file, 'w') as logf:
             proc = None

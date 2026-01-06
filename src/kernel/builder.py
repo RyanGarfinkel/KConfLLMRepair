@@ -4,6 +4,7 @@ from singleton_decorator import singleton
 from src.kernel.kconfig import KConfig
 from src.config import kernel_src
 import subprocess
+import os
 
 _BZIMAGE_PATH = 'arch/x86/boot/bzImage'
 
@@ -12,7 +13,8 @@ class Builder:
 
     def __init__(self):
         self.repo = KernelRepo()
-        self._KVM_CONFIG = '/kernel/configs/kvm_guest.config'
+        self._SYZKALLER_PATH = '/home/dev/opt/syzkaller'
+        self._KVM_CONFIG = 'kernel/configs/kvm_guest.config'
 
     def build_patch(self, output_path):
 
@@ -32,27 +34,11 @@ class Builder:
 
         return start, end
 
-    def merge_with_kvm_config(self, syzkaller_config):
-
-        log_info('Merging syzkaller config with KVM guest config...')
-
-        cmd = [
-            'scripts/kconfig/merge_config.sh',
-            '-m',
-            syzkaller_config,
-            self._KVM_CONFIG,
-        ]
-
-        with open(f'{kernel_src}/{syzkaller_config}', 'w') as out_file:
-            subprocess.run(cmd, stdout=out_file, check=True, cwd=kernel_src)
-
-        return True
-
     def _make_olddefconfig(self, arch='x86_64') -> bool:
         
         log_info('Generating olddefconfig...')
 
-        result = subprocess.run(f'make olddefconfig ARCH={arch} CROSS_COMPILE={arch}-linux-gnu-', shell=True, check=True, cwd=kernel_src)
+        result = subprocess.run(f'make olddefconfig ARCH={arch} CROSS_COMPILE={arch}-linux-gnu- LD=ld.lld', shell=True, check=True, cwd=kernel_src)
         if result.returncode != 0:
             log_error('Failed to generate olddefconfig.')
             return False
@@ -74,3 +60,16 @@ class Builder:
         log_success('Kernel built successfully.')
 
         return _BZIMAGE_PATH
+
+    def build_image(self):
+
+        # log_info('Building Debian Image...')
+
+        # subprocess.run(f'{self._SYZKALLER_PATH}/tools/create_debian_image.sh', shell=True, check=True)
+
+        # log_success('Debian image built successfully.')
+
+        # if not os.path.exists(f'{self._SYZKALLER_PATH}/tools/bullseye.img'):
+        #     raise Exception('Failed to build Debian image.')
+        
+        return f'{self._SYZKALLER_PATH}/tools/bullseye.img'

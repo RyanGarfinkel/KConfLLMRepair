@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y \
     libssl-dev libelf-dev \
     git wget unzip xz-utils lftp \
     openjdk-8-jdk \
-    qemu-system-x86 \
-    clang-15 llvm-15 lld-15 dwarves \
+    qemu-system-x86 qemu-user-static binfmt-support \
+    clang-15 llvm-15 lld-15 dwarves debootstrap sudo \
     libz3-java libjson-java sat4j lz4 zstd libdw-dev \
     gcc-x86-64-linux-gnu binutils-x86-64-linux-gnu && \
     update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 && \

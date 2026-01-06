@@ -1,0 +1,2 @@
+commit_start,commit_end,patch_path,base_config,base_booted,base_qemu_log,klocalizer_config,klocalizer_booted,klocalizer_qemu_log
+4c867b1ffde56beb54cdd42e80c1980dfc471ee3,195a402a75791e6e0d96d9da27ca77671bc656a8,/workspace/data/baselines/sample_0/changes.patch,/workspace/data/baselines/sample_0/base.config,False,/workspace/data/baselines/sample_0/base_qemu.log,/workspace/data/baselines/sample_0/klocalizer.config,False,/workspace/data/baselines/sample_0/klocalizer_qemu.log
