@@ -30,8 +30,8 @@ echo "Confirming that the base configuration boots..."
 
 # Building the kernel
 echo "Building the kernel..."
-
-make -j$(nproc) LD=ld.lld ARCH=$ARCH CROSS_COMPILE="ccache $ARCH-linux-gnu-" bzImage > $DEST_DIR/build.log 2>&1 || \
+export PATH="/usr/lib/ccache:$PATH"
+make -j$(nproc) LD=ld.lld ARCH=$ARCH CROSS_COMPILE="$ARCH-linux-gnu-" bzImage > $DEST_DIR/build.log 2>&1 || \
     { echo "Failed to build the kernel. Check $DEST_DIR/build.log for details." >&2; exit 1; }
 
 echo "Kernel built successfully. Starting QEMU test..."
