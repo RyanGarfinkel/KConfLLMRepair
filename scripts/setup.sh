@@ -10,12 +10,14 @@ echo 'export CROSS_COMPILE=x86_64-linux-gnu-' >> ~/.bashrc
 echo 'export KERNEL_SRC=$HOME/kernel' >> ~/.bashrc
 echo 'export SYZKALLER_SRC=$HOME/syzkaller' >> ~/.bashrc
 echo 'export Z3_SRC=$HOME/z3' >> ~/.bashrc
+echo 'export WORKSPACE=$WORKING_DIR' >> ~/.bashrc
 
 export ARCH=x86_64
 export CROSS_COMPILE=x86_64-linux-gnu-
 export KERNEL_SRC=$HOME/kernel
 export SYZKALLER_SRC=$HOME/syzkaller
 export Z3_SRC=$HOME/z3
+export WORKSPACE=$WORKING_DIR
 
 # Installing dependencies
 echo "Installing dependencies..."
