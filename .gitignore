@@ -7,3 +7,6 @@ syzkaller/
 __pycache__/
 debian.raw
 .env
+*.patch.kloc_targets
+klocalizer.log
+build.log

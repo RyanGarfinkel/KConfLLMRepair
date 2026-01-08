@@ -28,7 +28,7 @@ sudo apt-get install -y \
      flex bison bc \
      libssl-dev libelf-dev libncurses-dev dwarves \
      python3 python3-dev python3-pip pipx \
-     git wget unzip xz-utils lftp \
+     git wget unzip xz-utils lftp default-jdk \
      openjdk-8-jdk libz3-java libjson-java sat4j \
      qemu-system-x86 libdw-dev ccache \
      clang-15 llvm-15 lld-15 \

@@ -10,9 +10,76 @@ from src.kernel.repository import KernelRepo
 from src.kernel.boot import KernelBooter
 from src.utils.log import log_info, log_success, log_error
 from dotenv import load_dotenv
+import subprocess
 import os
 
 load_dotenv()
+
+_BASE_CONFIG = os.getenv('BASE_CONFIG')
+if not _BASE_CONFIG:
+    raise EnvironmentError('BASE_CONFIG not set.')
+
+if not os.path.exists(_BASE_CONFIG):
+    raise FileNotFoundError(f'Base config file not found at {_BASE_CONFIG}')
+
+_QEMU_TEST_SCRIPT = os.getenv('QEMU_TEST_SCRIPT')
+if not _QEMU_TEST_SCRIPT:
+    raise EnvironmentError('QEMU_TEST_SCRIPT not set.')
+
+cols = ['start_commit', 'end_commit', 'patch_path', 'klocalizer_config_path', 'qemu_boot_success']
+
+def generate_sample(dir, commit):
+
+    os.makedirs(dir, exist_ok=True)
+    result = []
+
+    repo = KernelRepo(commit)
+    klocalizer = KLocalizer()
+    builder = Builder()
+
+    # Build the patch
+    start, end, patch = repo.build_patch(dir)
+    result.extend([start, end, patch])
+
+    # Copy base config
+    base_config = KConfig(_BASE_CONFIG)
+    base_config.cp(f'{repo.path}/.config')
+
+    # Run KLocalizer
+    klocalizer_config = klocalizer.repair(repo.path, dir)
+    if klocalizer_config is None:
+        log_error('KLocalizer repair failed. Aborting sample generation.')
+        return result
+    
+    if not builder.make_olddefconfig(repo):
+        return result
+
+    klocalizer_config.cp(f'{dir}/klocalizer.config')
+    result.append(f'{dir}/klocalizer.config')
+
+    # Buid the kernel with updated config
+    bzImg = builder.build_kernel(repo, dir)
+    if not bzImg:
+        return result
+
+    # QEMU test
+    log_info('Running QEMU test...')
+    log_info(f'You can view the logs at {dir}/qemu.log')
+
+    cmd = ['sh', _QEMU_TEST_SCRIPT, bzImg, dir]
+    process = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    if process.returncode != 0:
+        log_error('QEMU test failed.')
+        result.append(False)
+    else:
+        log_success('Sample booted successfully in QEMU.')
+        result.append(True)
+
+    # Finish
+    log_info('Sample generation complete.')
+
+    return result
 
 def generate_single_baseline(dir):
 
