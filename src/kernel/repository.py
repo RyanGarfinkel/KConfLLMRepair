@@ -24,13 +24,13 @@ class KernelRepo:
 
     def __init__(self, commit):
 
-        self.path = f'/tmp/kernel-{commit.hexsha}'
+        self.path = f'/tmp/kernel-{commit}'
         if os.path.exists(self.path):
-            raise FileExistsError(f'Worktree already exists at {self.path}')
+            _KREPO.git.worktree('remove', '-f', self.path)
 
-        _KREPO.git.worktree('add', '--detach', self.path, commit.hexsha)
+        _KREPO.git.worktree('add', '-f', '--detach', self.path, commit)
         self._repo = Repo(self.path)
-        log_info(f'Created worktree at {self.path} for commit {commit.hexsha}')
+        log_info(f'Created worktree at {self.path} for commit {commit}')
 
         self._WINDOW_SIZE = 15
 

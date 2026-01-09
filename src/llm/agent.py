@@ -1,33 +1,47 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.agents import create_react_agent, AgentExecutor
-from toolbox import get_agent_tools
-
-max_iterations = 5
+from langchain.agents import create_agent
+# from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from src.utils.signature import extract_boot_signature
+from src.llm.prompt import system_prompt
+import json
 
 class Agent:
 
-    def __init__(self, id):
+    def __init__(self, dir, tools):
 
-        self.llm = ChatGoogleGenerativeAI(
-            model='gemini-2.5-pro',
-        )
+        # self.model = ChatGoogleGenerativeAI(
+        #     model='gemini-2.5-flash',
+        # )
 
-        self.tools = get_agent_tools(id)
+        self.model = ChatOpenAI(model='gpt-4o-mini')
 
-        self.prompt = ''
+        self.tools = tools
+        self.dir = dir
 
-        self.agent = create_react_agent(self.llm, self.tools, self.prompt)
-
-        self.executor = AgentExecutor.from_agent_and_tools(
-            agent=self.agent,
+        self.agent = create_agent(
+            model=self.model,
             tools=self.tools,
-            verbose=True,
-            max_iterations=max_iterations,
         )
 
-    def repair(self, log_path):
+    def repair(self):
+        
+        signatures = extract_boot_signature(f'{self.dir}/try_0/qemu.log')
+        if signatures and len(signatures) > 0:
+            input = f"The kernel failed to boot with panic signatures: {', '.join(signatures)}"
+        else:
+            input = "The kernel failed to boot. Please analyze the qemu log to determine the cause."
 
-        with open(log_path, 'r') as f:
-            log = f.read()
+        result = self.agent.invoke({
+            'messages': [
+                ('system', system_prompt),
+                ('user', input),
+            ]
+        })
 
-        prompt = f"""Given the following kernel build log, identify the most likely cause of the build failure and suggest a potential fix.
+        with open(f'{self.dir}/result.json', 'w') as f:
+            json.dump(result, f, indent=4)
+
+        output = result['output'].lower()
+        success = 'successfully' in output or 'you may stop now' in output
+
+        return success

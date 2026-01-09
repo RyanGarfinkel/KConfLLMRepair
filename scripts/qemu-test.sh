@@ -9,7 +9,6 @@ DIR=$2
 LOG_FILE=$DIR/qemu.log
 rm -f $LOG_FILE
 
-echo "testing.... QEMU FILE"
 cd $KERNEL_SRC
 
 qemu-system-x86_64 -m 2G -smp 1 -kernel $BZ_IMG \

@@ -1,43 +1,49 @@
 # KConf LLM Repair
 
-## Dependencies
-The following script will clone the Z3, linux-next, and Syzkaller repositories, copy an image of debian, then build the docker image:
+## Getting Started
+
+### 1. Setup
+The following script installs package dependencies, sets up environment variables, clones the linux-next kernel, Z3, SuperC, and kmax, and installs python packages needed to run the scripts. Run the following from the root of this repository: ```/KConfLLMRepair```
+
 ```bash
-sh scripts/setup.sh
+sh  scripts/setup.sh
+source ~/.bashrc
 ```
 
-## Running the environment
-Run the docker container with the following command:
-```bash
-docker run --rm -it --privileged \
-    -v "$(pwd):/workspace" \
-    kconf-llm-repair
-```
-
-## Getting started
-Run the following inside the Docker container from the ```/workspace``` directory:
-
-### 1. Setting up the .env file
-Create an```.env``` file in the ```/workspace``` directory for you Google Gemini API key. Then fill in the following information:
+### 2. Environment Configuration
+Create an```.env``` file in the ```/KConfLLMRepair``` directory for you Google Gemini API key. Then fill in the following information:
 
 ```env
 GOOGLE_API_KEY=your-api-key-here
 ```
 
-### 2. Baseline configurations
+### 3. Base Configuration
+The following script generates the base configuration used in this experiment. It also builds the linux-next kernel with this configuration then confirms it boots with QEMU.
 ```bash
-cd /workspace
-python3 scripts/generate_baselines.py
+sh scripts/generate_base_config.sh
 ```
-The generate_baselines script will produce ```n``` base configurations and inital klocalizer repaired configurations. The following file structure will be created:
+The fololwing outputs the following files:
 ```
-data/baselines/
+data/base/
+├── base.config
+├── build.log
+└── qemu.log
+```
+
+### 4. Sample Generation
+The following script generates ```n``` samples. Each sample contains a build log, change patch, klocalizer configuration, klocalizer log, and a QEMU log. ```n``` is an optional parameter which specifies how many samples to generate. By default, ```n=10```. A ```samples.csv``` file will be generated in the ```/base``` directory with information about each sample.
+```bash
+sh scripts/generate_samples.py --n 10
+```  
+The following adds to the file strcutre in ```/base/samples```:
+```
+data/base/samples
 ├── sample_0/
-│   ├── changes.patcs
-│   ├── base.config
-│   ├── base_qemu.log
-│   └── klocalizer.config
-│   └── klocalizer_qemu.log
+│   ├── build.log
+│   ├── changes.patch
+│   ├── klocalizer.config
+│   ├── klocalizer.log
+│   └── qemu.log
 │
 ├── ...
 │
@@ -45,10 +51,12 @@ data/baselines/
 │   ├── changes.patcs
 │   ├── base.config
 │   ├── base_qemu.log
-│   └── klocalizer.config
+│   ├── klocalizer.config
 │   └── klocalizer_qemu.log
 ```
 
-### 3. LLM Repair
+## How to Use
+The following runs the repair on the samples previously generated. It takes one optional argument ```n```, which is the number of samples to repair. Please make sure there are enough samples within the ```/samples``` directory. By default, ```n=10```.
 ```bash
+sh scripts/generate_repairs.py --n 10
 ```

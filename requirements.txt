@@ -4,5 +4,8 @@ dotenv
 google-genai
 langchain
 langchain-google-genai
+langchain-core
+langchain-community
 singleton-decorator
 pandas
+langchain-openai

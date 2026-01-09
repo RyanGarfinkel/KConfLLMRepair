@@ -40,7 +40,11 @@ class KConfig:
 
         with open(self.path, 'r') as src_file:
             with open(dest, 'w') as dest_file:
-                dest_file.write(src_file.read())      
+                dest_file.write(src_file.read())
+
+    def get(self, option):
+
+        return self.options.get(option, None)   
 
     def diff(self, config): # self - config
 

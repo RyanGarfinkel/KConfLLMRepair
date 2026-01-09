@@ -1,2 +1,3 @@
-start_commit,end_commit,patch_path,klocalizer_config_path,qemu_boot_success
-041088ec8d6d29ee5c955933ab31884b7a395aa3,9a87ce288fe30f268b3a598422fe76af9bb2c2d2,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_0/changes.patch,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_0/klocalizer.config,True
+start_commit,end_commit,patch,config,build_log,qemu_boot_result
+98172bb85ac5887e99e93fca51fd36fececfea4c,9a87ce288fe30f268b3a598422fe76af9bb2c2d2,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_0/changes.patch,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_0/klocalizer.config,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_0/build.log,True
+fbfcffee1bcd3a89a78fc087bbce4b298be8248e,98172bb85ac5887e99e93fca51fd36fececfea4c,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_1/changes.patch,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_1/klocalizer.config,/home/ubuntu/KConfLLMRepair/data/base/samples/sample_1/build.log,True

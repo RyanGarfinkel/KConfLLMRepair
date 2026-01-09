@@ -11,6 +11,9 @@ echo 'export KERNEL_SRC=$HOME/kernel' >> ~/.bashrc
 echo 'export SYZKALLER_SRC=$HOME/syzkaller' >> ~/.bashrc
 echo 'export Z3_SRC=$HOME/z3' >> ~/.bashrc
 echo 'export WORKSPACE=$WORKING_DIR' >> ~/.bashrc
+echo 'export DEBIAN_IMG=$HOME/debian.raw' >> ~/.bashrc
+echo 'export BASE_CONFIG=$WORKING_DIR/data/base/base.config' >> ~/.bashrc
+echo 'export QEMU_TEST_SCRIPT=$WORKING_DIR/scripts/qemu_test.sh' >> ~/.bashrc
 
 export ARCH=x86_64
 export CROSS_COMPILE=x86_64-linux-gnu-
@@ -18,6 +21,9 @@ export KERNEL_SRC=$HOME/kernel
 export SYZKALLER_SRC=$HOME/syzkaller
 export Z3_SRC=$HOME/z3
 export WORKSPACE=$WORKING_DIR
+export DEBIAN_IMG=$HOME/debian.raw
+export BASE_CONFIG=$WORKING_DIR/data/base/base.config
+export QEMU_TEST_SCRIPT=$WORKING_DIR/scripts/qemu_test.sh
 
 # Installing dependencies
 echo "Installing dependencies..."
@@ -37,37 +43,41 @@ sudo apt-get install -y \
 sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
 sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
 
-# Go installation
-echo "Installing Go..."
+# # Go installation
+# echo "Installing Go..."
 
-GO_VERSION=1.24.4
-GO_ARCH=amd64
+# GO_VERSION=1.24.4
+# GO_ARCH=amd64
 
-wget https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
+# wget https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
 
-sudo tar -C /usr/local -xzf go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
-rm go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
+# sudo tar -C /usr/local -xzf go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
+# rm go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
 
-echo 'export GOROOT=/usr/local/go' >> ~/.bashrc
-echo 'export PATH=$PATH:$GOROOT/bin' >> ~/.bashrc
+# echo 'export GOROOT=/usr/local/go' >> ~/.bashrc
+# echo 'export PATH=$PATH:$GOROOT/bin' >> ~/.bashrc
 
-export GOROOT=/usr/local/go
-export PATH=$PATH:$GOROOT/bin
+# export GOROOT=/usr/local/go
+# export PATH=$PATH:$GOROOT/bin
 
 # Linux Kernel
 echo "Cloning Linux Kernel..."
 git clone https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git $KERNEL_SRC
 
+# Debian Image Install
+wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-nocloud-amd64.raw
+mv debian-12-nocloud-amd64.raw $DEBIAN_IMG
+
 # Syzkaller
 echo "Cloning and building Syzkaller..."
-git clone https://github.com/google/syzkaller.git $SYZKALLER_SRC
-cd $SYZKALLER_SRC
-make
+git clone https://github.com/google/syzkaller.git --depth 1 $SYZKALLER_SRC
+# cd $SYZKALLER_SRC
+# make
 
-echo 'export PATH=$SYZKALLER_SRC/bin:$PATH' >> ~/.bashrc
-export PATH=$SYZKALLER_SRC/bin:$PATH
+# echo 'export PATH=$SYZKALLER_SRC/bin:$PATH' >> ~/.bashrc
+# export PATH=$SYZKALLER_SRC/bin:$PATH
 
-cd $WORKING_DIR
+# cd $WORKING_DIR
 
 # Z3
 echo "Cloning and building Z3..."

@@ -58,7 +58,7 @@ class Builder:
 
             log_success('Kernel built successfully.')
 
-            return self._BZIMAGE_PATH            
+            return self._BZIMAGE_PATH, f'{dir}/build.log'        
 
         except subprocess.CalledProcessError as e:
             log_error(f'Kernel build failed: {e}')
