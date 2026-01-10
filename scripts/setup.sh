@@ -12,8 +12,10 @@ echo 'export SYZKALLER_SRC=$HOME/syzkaller' >> ~/.bashrc
 echo 'export Z3_SRC=$HOME/z3' >> ~/.bashrc
 echo 'export WORKSPACE=$WORKING_DIR' >> ~/.bashrc
 echo 'export DEBIAN_IMG=$HOME/debian.raw' >> ~/.bashrc
-echo 'export BASE_CONFIG=$WORKING_DIR/data/base/base.config' >> ~/.bashrc
+echo 'export BASE_DIR=$WORKING_DIR/data/base' >> ~/.bashrc
+echo 'export BASE_CONFIG=$BASE_DIR/base.config' >> ~/.bashrc
 echo 'export QEMU_TEST_SCRIPT=$WORKING_DIR/scripts/qemu_test.sh' >> ~/.bashrc
+echo 'export SUPERC_PATH=$HOME/.local/bin/superc_linux.sh' >> ~/.bashrc
 
 export ARCH=x86_64
 export CROSS_COMPILE=x86_64-linux-gnu-
@@ -22,8 +24,10 @@ export SYZKALLER_SRC=$HOME/syzkaller
 export Z3_SRC=$HOME/z3
 export WORKSPACE=$WORKING_DIR
 export DEBIAN_IMG=$HOME/debian.raw
-export BASE_CONFIG=$WORKING_DIR/data/base/base.config
+export BASE_DIR=$WORKING_DIR/data/base
+export BASE_CONFIG=$BASE_DIR/base.config
 export QEMU_TEST_SCRIPT=$WORKING_DIR/scripts/qemu_test.sh
+export SUPERC_PATH=$HOME/.local/bin/superc_linux.sh
 
 # Installing dependencies
 echo "Installing dependencies..."
@@ -93,7 +97,6 @@ echo 'export LD_LIBRARY_PATH=$Z3_SRC/build:$LD_LIBRARY_PATH' >> ~/.bashrc
 export CLASSPATH=/usr/share/java/org.sat4j.core.jar:/usr/share/java/json.jar:$Z3_SRC/build/com.microsoft.z3.jar:$CLASSPATH
 export LD_LIBRARY_PATH=$Z3_SRC/build:$LD_LIBRARY_PATH
 
-
 cd $WORKING_DIR
 
 # SuperC
@@ -107,7 +110,7 @@ export CLASSPATH=$HOME/.local/share/superc/superc.jar:$HOME/.local/share/superc/
 # Python packages
 echo "Installing Python packages..."
 cd $WORKING_DIR
-pipx install kmax
+pipx install kmax==4.9.1rc1
 pipx ensurepath
 
 python3 -m pip install --upgrade pip --break-system-packages

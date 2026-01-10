@@ -29,6 +29,7 @@ def get_agent_tools(repo, dir):
         raise FileNotFoundError(f'Inital sample not found at {dir}/try_0.')
 
     config = KConfig(f'{dir}/try_0/klocalizer.config')
+    config.cp(f'{repo.path}/.config')
 
     @tool
     def search_klocalizer_log(regex: str) -> list[str]:
@@ -154,12 +155,21 @@ def get_agent_tools(repo, dir):
         os.makedirs(try_dir, exist_ok=True)
         tries += 1
 
+        # Filters out which options are real.
+        define = [opt for opt in define if _BASE_CONFIG.get(opt) is not None]
+        undefine = [opt for opt in undefine if _BASE_CONFIG.get(opt) is not None]
+
+        unreal_options = [opt for opt in define + undefine if _BASE_CONFIG.get(opt) is None]
+        if len(unreal_options) > 0:
+            return f'The following are not valid configuration options: {", ".join(unreal_options)}. No changes applied.'
+
         # KLocalizer repair
         updated_config = klocalizer.repair(repo.path, try_dir, define=define, undefine=undefine)
         if updated_config is None:
             return 'KLocalizer repair failed. No changes applied. You may view the klocalizer log.'
 
         config = updated_config
+        config.cp(f'{try_dir}/klocalizer.config')
 
         # Building the image
         if not builder.make_olddefconfig(repo):

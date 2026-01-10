@@ -1,38 +1,28 @@
 from src.utils.log import log_error, log_info, log_success
 from singleton_decorator import singleton
 from src.kernel.kconfig import KConfig
-# from src.config import kernel_src
 from datetime import timedelta
+from src.config import config
 from git import Repo
 import subprocess
 import os
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
-_KERNEL_SRC = os.getenv('KERNEL_SRC')
-if not _KERNEL_SRC:
-    raise EnvironmentError('kernel_src variable not set.')
-
-if not os.path.exists(_KERNEL_SRC):
-    raise FileNotFoundError(f'Kernel source path not found at {_KERNEL_SRC}')
-
-_KREPO = Repo(_KERNEL_SRC)
+_KREPO = Repo(config.KERNEL_SRC)
 
 class KernelRepo:
 
     def __init__(self, commit):
 
-        self.path = f'/tmp/kernel-{commit}'
+        hexsha = commit.hexsha if hasattr(commit, 'hexsha') else str(commit)
+        self.path = f'/tmp/kernel-{hexsha}'
         if os.path.exists(self.path):
             _KREPO.git.worktree('remove', '-f', self.path)
 
         _KREPO.git.worktree('add', '-f', '--detach', self.path, commit)
-        self._repo = Repo(self.path)
-        log_info(f'Created worktree at {self.path} for commit {commit}')
 
-        self._WINDOW_SIZE = 15
+        self._repo = Repo(self.path)
+        
+        log_info(f'Created worktree at {self.path} for commit {commit}')
 
     def __del__(self):
         try:
@@ -40,14 +30,14 @@ class KernelRepo:
         except Exception as e:
             log_error(f'Failed to remove worktree at {self.path}: {e}')
 
-    def build_patch(self, dir):
+    def build_patch(self, dir, patch_size):
 
         log_info('Building the code patch...')
 
         commits = []
         cur = self._repo.head.commit
 
-        for _ in range(self._WINDOW_SIZE):
+        for _ in range(patch_size):
             
             commits.append(cur)
             if not cur.parents:

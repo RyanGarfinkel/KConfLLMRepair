@@ -1,24 +1,12 @@
-from src.config import superc_linux_script_path
 from src.utils.log import log_info, log_error, log_success
 from singleton_decorator import singleton
 from src.kernel.kconfig import KConfig
-from dotenv import load_dotenv
+from src.config import config
 import subprocess
 import os
 
-load_dotenv()
-
-_ARCH = os.getenv('ARCH')
-if not _ARCH:
-    raise EnvironmentError('ARCH not set.')
-
 @singleton
 class KLocalizer():
-
-    def __init__(self):
-
-        self.klocalizer_path = '/home/ubuntu/.local/bin/klocalizer'
-        self.superc_path = '/home/ubuntu/.local/bin/superc_linux.sh'
 
     def repair(self, kernel_src, dir, define=[], undefine=[]):
 
@@ -28,10 +16,10 @@ class KLocalizer():
 
         cmd = [
             'klocalizer',
-            '--superc-linux-script', self.superc_path,
+            '--superc-linux-script', config.SUPERC_PATH,
             '--include-mutex', patch,
             '--cross-compiler', 'gcc',
-            '--arch', _ARCH   
+            '--arch', config.ARCH   
         ]
 
         cmd.extend([f'--define {opt}' for opt in define])
@@ -48,12 +36,16 @@ class KLocalizer():
                 
                 result.wait()
             
+            if result.returncode != 0:
+                log_error(f'klocalizer repair failed with return code {result.returncode}. Check klocalizer.log for details.')
+                return None
+            
             log_success('klocalizer repair completed.')
 
-            config = KConfig(f'{kernel_src}/0-{_ARCH}.config')
-            config.mv(f'{kernel_src}/.config')
+            klocalizer_config = KConfig(f'{kernel_src}/0-{config.ARCH}.config')
+            klocalizer_config.mv(f'{kernel_src}/.config')
 
-            return config
+            return klocalizer_config
         except subprocess.CalledProcessError as e:
             log_error(f'klocalizer repair failed: {e}')
             return None

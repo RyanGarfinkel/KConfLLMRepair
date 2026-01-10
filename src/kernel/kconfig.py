@@ -1,4 +1,3 @@
-from src.config import kernel_src
 import os
 import re
 

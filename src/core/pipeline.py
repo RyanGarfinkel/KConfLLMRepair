@@ -9,19 +9,11 @@ from src.kernel.boot import does_boot
 from src.models.sample import Sample
 from src.llm.agent import Agent
 from dotenv import load_dotenv
+from src.config import config
 import subprocess
 import os
 
-load_dotenv()
-
-_BASE_CONFIG = os.getenv('BASE_CONFIG')
-if not _BASE_CONFIG:
-    raise EnvironmentError('BASE_CONFIG not set.')
-
-if not os.path.exists(_BASE_CONFIG):
-    raise FileNotFoundError(f'Base config file not found at {_BASE_CONFIG}')
-
-def generate_sample(dir, commit):
+def generate_sample(dir, commit, patch_size):
 
     os.makedirs(dir, exist_ok=True)
 
@@ -30,12 +22,12 @@ def generate_sample(dir, commit):
     builder = Builder()
 
     # Build the patch
-    start, end, patch = repo.build_patch(dir)
+    start, end, patch = repo.build_patch(dir, patch_size)
 
     result = Sample(start_commit=start.hexsha, end_commit=end.hexsha, patch=patch, config=None, build_log=None, qemu_boot_result=None)
 
     # Copy base config
-    base_config = KConfig(_BASE_CONFIG)
+    base_config = KConfig(config.BASE_CONFIG)
     base_config.cp(f'{repo.path}/.config')
 
     # Run KLocalizer
