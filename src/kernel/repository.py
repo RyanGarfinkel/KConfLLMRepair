@@ -1,171 +1,83 @@
-from src.utils.log import log_error, log_info, log_success
-from singleton_decorator import singleton
-from src.kernel.kconfig import KConfig
-from datetime import timedelta
-from src.config import config
+from src.config import settings
+from src.utils import log
 from git import Repo
-import subprocess
+import shutil
 import os
-
-_KREPO = Repo(config.KERNEL_SRC)
 
 class KernelRepo:
 
-    def __init__(self, commit):
+    __main_repo: Repo | None = None
 
-        hexsha = commit.hexsha if hasattr(commit, 'hexsha') else str(commit)
-        self.path = f'/tmp/kernel-{hexsha}'
+    def __init__(self, commit: str):
+
+        self.__load_main_repo()
+
+        self.commit = commit
+        self.path = f'{settings.WORKTREE_DIR}/{commit[:12]}'
+        
+        self.__create_worktree()
+
+    def __load_main_repo(self):
+        if KernelRepo.__main_repo is None:
+            KernelRepo.__main_repo = Repo(settings.KERNEL_SRC)
+
+    def __create_worktree(self):
+
+        log.info(f'Creating worktree for commit {self.commit}.')
+
         if os.path.exists(self.path):
-            _KREPO.git.worktree('remove', '-f', self.path)
+            log.info(f'Worktree for commit {self.commit} already exists. Cleaning up before creating a new one.')
+            self.cleanup()
 
-        _KREPO.git.worktree('add', '-f', '--detach', self.path, commit)
+        KernelRepo.__main_repo.git.worktree('add', '-f', self.path, self.commit)
+        self.repo = Repo(self.path)
 
-        self._repo = Repo(self.path)
-        
-        log_info(f'Created worktree at {self.path} for commit {commit}')
+        log.success(f'Worktree for commit {self.commit} created successfully.')
 
-    def __del__(self):
-        try:
-            _KREPO.git.worktree('remove', '-f', self.path)
-        except Exception as e:
-            log_error(f'Failed to remove worktree at {self.path}: {e}')
+    def make_patch(self, output_dir: str, commit_window: int) -> (bool, str | None):
 
-    def build_patch(self, dir, patch_size):
+        log.info(f'Creating patch for commit {self.commit}.')
 
-        log_info('Building the code patch...')
+        end = self.repo.head.commit
 
-        commits = []
-        cur = self._repo.head.commit
+        commits = list(self.repo.iter_commits(end, max_count=commit_window))
 
-        for _ in range(patch_size):
-            
-            commits.append(cur)
-            if not cur.parents:
-                break
+        if not commits:
+            log.info(f'No commits found for commit {self.commit}. Cannot create patch.')
+            return False, None
 
-            cur = cur.parents[0]
-        
         start = commits[-1]
-        end = commits[0]
 
-        path = f'{dir}/changes.patch'
+        patch = self.repo.git.diff(f'{start.hexsha}..{end.hexsha}')
+        patch_file = f'{output_dir}/changes.patch'
 
-        diff = self._repo.git.diff(f'{start.hexsha}..{end.hexsha}')
-        if not diff:
-            log_error('No changes found between the specified commits.')
-            return None, None, None
-        
-        with open(path, 'w') as f:
-            f.write(diff)
+        if not patch:
+            log.info(f'No changes found between {start.hexsha} and {end.hexsha}. Cannot create patch.')
+            return False, None
 
-        log_success(f'Kernel patch saved to {path}.')
+        with open(patch_file, 'w') as f:
+            f.write(patch)
 
-        return start, end, path
+        log.success(f'Patch for commit {self.commit} created successfully at {patch_file}.')
 
+        return True, start.hexsha
 
+    def cleanup(self):
 
+        try:
+            log.info(f'Cleaning up worktree for commit {self.commit}.')
 
-# _COMMIT_WINDOW = 25
+            KernelRepo.__main_repo.git.worktree('remove', '-f', self.path)
+        except Exception as e:
+            log.error(f'Error cleaning up worktree for commit {self.commit}: {e}')
+        finally:
 
-# @singleton
-# # class KernelRepo:
+            if not os.path.exists(self.path):
+                return
 
-#     def __init__(self):
-
-#         if not os.path.exists(kernel_src):
-#             raise FileNotFoundError(f'Kernel source path not found at {kernel_src}')
-        
-#         self._repo = Repo(kernel_src)
-#         self._end_commit = self._repo.head.commit
-    
-#     def clean(self) -> bool:
-        
-#         self._repo.git.reset('--hard')
-#         self._repo.git.clean('-fdx')
-
-#     def checkout(self, commit) -> bool:
-        
-#         try:
-#             self.clean()
-#             self._repo.git.checkout(commit.hexsha)
-#             return True
-#         except Exception as e:
-#             log_error(f'Failed to checkout commit {commit.hexsha}: {e}')
-#             return False
-        
-#     def checkout_tag(self, tag_name: str) -> bool:
-
-#         log_info(f'Checking out tag {tag_name}...')
-#         try:
-#             self.clean()
-#             self._repo.git.checkout(tag_name)
-#             return True
-#         except Exception as e:
-#             log_error(f'Failed to checkout tag {tag_name}: {e}')
-#             return False
-
-#     def fetch_history_tag(self) -> bool:
-#         """
-#         Pre-fetches linux-next tags based on the CURRENT HEAD of the repo.
-#         """
-#         # 1. IGNORE the argument. Look at what is actually checked out.
-#         # This fixes the mismatch between Python's view and syz-kconf's view.
-#         target_date = self._repo.head.commit.committed_datetime
-        
-#         # 2. Shotgun approach: Try Target Date +/- 1 Day to handle timezone diffs
-#         dates_to_try = [
-#             target_date, 
-#             target_date + timedelta(days=1), 
-#             target_date - timedelta(days=1)
-#         ]
-
-#         # 3. Setup Remote
-#         history_url = 'https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next-history.git'
-#         try:
-#             if 'linux-next-history' not in self._repo.remotes:
-#                 self._repo.create_remote('linux-next-history', history_url)
-#         except Exception as e:
-#             log_error(f'Failed to setup remote: {e}')
-#             return False
-
-#         success = False
-#         for date_obj in dates_to_try:
-#             tag_name = f"next-{date_obj.strftime('%Y%m%d')}"
-            
-#             # Check local existence
-#             try:
-#                 self._repo.git.show(tag_name, '--stat')
-#                 if date_obj == target_date:
-#                     log_info(f'Tag {tag_name} exists locally.')
-#                 success = True
-#                 continue 
-#             except Exception:
-#                 pass 
-
-#             # Fetch
-#             log_info(f'Fetching tag candidate {tag_name} via HTTPS...')
-#             try:
-#                 self._repo.git.fetch('linux-next-history', 'tag', tag_name, '--no-tags')
-#                 log_success(f'Successfully fetched {tag_name}')
-#                 success = True
-#             except Exception:
-#                 pass
-        
-#         return success
-    
-#     def get_commit_window(self, n=_COMMIT_WINDOW):
-
-#         commits = []
-#         current_commit = self._end_commit
-
-#         for _ in range(n):
-#             commits.append(current_commit)
-#             if not current_commit.parents:
-#                 break
-#             current_commit = current_commit.parents[0]
-        
-#         return commits
-    
-#     def diff(self, start_commmit, end_commit):
-         
-#          return self._repo.git.diff(f'{start_commmit.hexsha}..{end_commit.hexsha}')
+            try:
+                log.info(f'Removing worktree directory for commit {self.commit}.')
+                shutil.rmtree(self.path)
+                log.success(f'Worktree directory for commit {self.commit} removed successfully.')
+            except Exception as e:
+                log.error(f'Error removing worktree directory for commit {self.commit}: {e}')

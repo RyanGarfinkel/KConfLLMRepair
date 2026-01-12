@@ -1,48 +1,49 @@
-from src.utils.log import log_info, log_success, log_error
-from src.kernel.repository import KernelRepo
+from src.kernel import KernelRepo, KConfig
 from singleton_decorator import singleton
-from src.kernel.kconfig import KConfig
-from src.config import config
+from src.config import settings
+from src.utils import log
 import subprocess
 import os
 
 @singleton
 class Builder:
 
-    def make_olddefconfig(self, krepo):
+    def __make_olddefconfig(self, repo: KernelRepo) -> bool:
 
-        log_info('Generating olddefconfig...')
+        log.info(f'Generating olddefconfig for commit {repo.commit}...')
 
         cmd = ['make', 'olddefconfig']
         try:
-            result = subprocess.run(cmd, cwd=krepo.path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if result.returncode != 0:
-                log_error('Failed to generate olddefconfig.')
-                return False
+            subprocess.run(cmd, cwd=repo.path, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            log.success(f'olddefconfig generated successfully for commit {repo.commit}.')
 
             return True
 
         except subprocess.CalledProcessError as e:
-            log_error(f'Failed to generate olddefconfig: {e}')
+            log.error(f'Failed to generate olddefconfig for commit {repo.commit}: {e}')
             return False
 
-    def build_kernel(self, krepo, dir):
+    def build(self, repo: KernelRepo, output_dir: str) -> bool:
 
-        log_info('Building the kernel...')
+        if not self.__make_olddefconfig(repo):
+            return False
 
-        cwd = krepo.path
+        log.info(f'Starting kernel build process for {repo.commit}...')
+
         cmd = [
-            'make', '-j$(nproc)',
+            'make', f'-j{settings.JOBS}',
             'LD', 'ld.lld',
             'ARCH', 'x86_64',
             'CROSS_COMPILE', 'ccache x86_64-linux-gnu-',
             'bzImage'
         ]
 
-        try:
+        log_file = f'{output_dir}/build.log'
 
-            with open(f'{dir}/build.log', 'w') as f:
-                result = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=cwd, text=True, bufsize=1)
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            with open(log_file, 'w') as f:
+                result = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=repo.path, text=True, bufsize=1)
 
                 for line in result.stdout:
                     f.write(line)
@@ -50,10 +51,19 @@ class Builder:
 
                 result.wait()
 
-            log_success('Kernel built successfully.')
+            if result.returncode != 0:
+                log.error(f'Kernel build failed for commit {repo.commit}. Check build.log for details.')
+                return False
 
-            return config.BZIMAGE_PATH, f'{dir}/build.log'        
+            if not os.path.exists(f'{repo.path}/{settings.BZIMAGE}'):
+                log.error(f'Kernel build failed for commit {repo.commit}. Check build.log for details.')
+                return False
 
+            log.success(f'Kernel built successfully for commit {repo.commit}.')
+
+            return True
         except subprocess.CalledProcessError as e:
-            log_error(f'Kernel build failed: {e}')
-            return None, None
+            log.error(f'Kernel build failed for commit {repo.commit}: {e}')
+            return False
+
+builder = Builder()

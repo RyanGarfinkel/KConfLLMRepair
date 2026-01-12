@@ -1,34 +1,45 @@
-from src.utils.log import log_info, log_error, log_success
+from src.kernel import KernelRepo, KConfig
 from singleton_decorator import singleton
-from src.kernel.kconfig import KConfig
-from src.config import config
+from src.config import settings
+from src.utils import log
 import subprocess
 import os
 
 @singleton
-class KLocalizer():
+class KLocalizer:
 
-    def repair(self, kernel_src, dir, define=[], undefine=[]):
+    def run(self, repo: KernelRepo, output_dir: str, define: list[str] = [], undefine: list[str] = []) -> KConfig | None:
+        
+        os.makedirs(output_dir, exist_ok=True)
 
-        log_info('Starting klocalizer repair...')
+        # Verify patch exists
+        patch_path = f'{output_dir}/changes.patch'
+        if not os.path.exists(patch_path):
+            log.error(f'Patch file {patch_path} does not exist. Cannot run KLocalizer for commit {repo.commit}.')
+            return None
 
-        patch = f'{dir}/changes.patch'
+        # Run KLocalizer
+        log.info(f'Running KLocalizer for commit {repo.commit}...')
 
         cmd = [
             'klocalizer',
-            '--superc-linux-script', config.SUPERC_PATH,
-            '--include-mutex', patch,
+            '--superc-linux-script', settings.SUPERC_PATH,
+            '--include-mutex', patch_path,
             '--cross-compiler', 'gcc',
-            '--arch', config.ARCH   
+            '--arch', settings.ARCH
         ]
 
-        cmd.extend([f'--define {opt}' for opt in define])
-        cmd.extend([f'--undefine {opt}' for opt in undefine])
+        for opt in define:
+            cmd.extend(['--define', opt])
+            
+        for opt in undefine:
+            cmd.extend(['--undefine', opt])
 
+        log_file = f'{output_dir}/klocalizer.log'
+        
         try:
-
-            with open(f'{dir}/klocalizer.log', 'w') as f:
-                result = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=kernel_src, text=True, bufsize=1)
+            with open(log_file, 'w') as f:
+                result = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=repo.path, text=True, bufsize=1)
 
                 for line in result.stdout:
                     f.write(line)
@@ -37,15 +48,19 @@ class KLocalizer():
                 result.wait()
             
             if result.returncode != 0:
-                log_error(f'klocalizer repair failed with return code {result.returncode}. Check klocalizer.log for details.')
+                log.error(f'klocalizer repair failed for commit {repo.commit}. Check log for details.')
                 return None
             
-            log_success('klocalizer repair completed.')
+            klocalizer_config = KConfig(f'{repo.path}/0-{settings.ARCH}.config')
+            klocalizer_config.mv(f'{repo.path}/.config')
 
-            klocalizer_config = KConfig(f'{kernel_src}/0-{config.ARCH}.config')
-            klocalizer_config.mv(f'{kernel_src}/.config')
+            os.remove(f'{output_dir}/changes.patch.kloc_targets')
+            
+            log.success('klocalizer repair completed.')
 
             return klocalizer_config
         except subprocess.CalledProcessError as e:
-            log_error(f'klocalizer repair failed: {e}')
+            log.error(f'klocalizer repair failed: {e}')
             return None
+
+klocalizer = KLocalizer()

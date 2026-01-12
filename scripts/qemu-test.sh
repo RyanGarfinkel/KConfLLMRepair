@@ -3,13 +3,14 @@ WORKING_DIR=$(pwd)
 TIMEOUT=300 # 5m
 SUCCESS_STRING="login:"
 
-BZ_IMG=$1
-DIR=$2
+CWD=$1
+BZ_IMG=$2
+DIR=$3
 
 LOG_FILE=$DIR/qemu.log
 rm -f $LOG_FILE
 
-cd $KERNEL_SRC
+cd $CWD
 
 qemu-system-x86_64 -m 2G -smp 1 -kernel $BZ_IMG \
     -append "console=ttyS0 root=/dev/vda1 ro earlyprintk=serial net.ifnames=0 selinux=0 systemd.mask=networking.service systemd.mask=ifupdown-pre.service systemd.mask=systemd-rfkill.service" \

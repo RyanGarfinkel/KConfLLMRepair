@@ -1,64 +1,64 @@
-from dotenv import load_dotenv
-from git import Repo
-import os
-
-load_dotenv()
-
-# SuperC
-superc_linux_script_path = '/home/dev/.local/bin/superc_linux.sh'
-
-
-# Kernel
-kernel_src = os.path.expandvars('$KERNEL_SRC')
-if not os.path.exists(kernel_src):
-    raise FileNotFoundError(f'Kernel source path not found at {kernel_src}')
-
-kernel_repo = Repo(kernel_src)
-
-# QEMU
-debian_img_path = '/home/dev/opt/debian.raw'
-
-qemu_log_dir = '/workspace/logs/qemu'
-# os.makedirs(qemu_log_dir, exist_ok=True)
-
-# Syzkaller
-syzkaller_yml_path = '/home/dev/opt/syzkaller/dashboard/config/linux/main.yml'
-# if not os.path.exists(syzkaller_yml_path):
-#     raise FileNotFoundError(f'Syzkaller config file not found at {syzkaller_yml_path}')
-
-syzkaller_output_path = '/home/dev/opt/syzkaller/dashboard/config/linux/upstream-apparmor-kasan.config'
-
-from pydantic import field_validator, ValidationError
-from pydantic_settings import BaseSettings
-from pathlib import Path
+from pydantic import field_validator, model_validator, ValidationInfo
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from src.utils import log
+import sys
 import os
 
 class Settings(BaseSettings):
 
-    ARCH: str
-    
+    # Core 
     KERNEL_SRC: str
-    BZIMAGE_PATH: str = 'arch/x86/boot/bzImage'
-    
-    SUPERC_PATH: str
-    QEMU_TEST_SCRIPT: str
-
-    BASE_DIR: str
     BASE_CONFIG: str
-    # SAMPLE_DIR: str
-    # EXPERIMENT_DIR: str
+    SAMPLE_DIR: str
+    EXPERIMENT_DIR: str
+    WORKTREE_DIR: str
 
-    WORKSPACE: str = str(Path(__file__).parent.parent.absolute())
+    # Jobs
+    JOBS: int = 8
 
-    @classmethod
-    @field_validator('KERNEL_SRC', 'SUPERC_PATH', 'QEMU_TEST_SCRIPT')
-    def validate_path_exists(cls, v):
+    # Dependency
+    SUPERC_PATH: str
+    ARCH: str
 
-        path = v.expanduser().resolve()
+    # API Keys
+    GOOGLE_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
 
-        if not path.exists():
-            raise ValidationError(f'{path} does not exist.')
+    # Local Paths
+    BZIMAGE: str = 'arch/x86/boot/bzImage'
 
-        return path
+    model_config = SettingsConfigDict(
+        env_file_encoding='utf-8',
+        env_file='.env',
+    )
 
-config = Settings()
+    @property
+    def QEMU_TEST_SCRIPT(self) -> str:
+        path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'qemu-test.sh')
+        return os.path.abspath(path)
+
+    @field_validator('SAMPLE_DIR', 'EXPERIMENT_DIR', 'WORKTREE_DIR')
+    def validate(cls, v: str) -> str:
+        os.makedirs(v, exist_ok=True)
+
+        return v
+
+    @field_validator('KERNEL_SRC', 'BASE_CONFIG', 'SUPERC_PATH')
+    def validate_kernel_exists(cls, v: str, info: ValidationInfo) -> str:
+        if not os.path.exists(v):
+            raise ValueError(f'{info.field_name} path does not exist: {v}')
+
+        return v
+
+    @model_validator(mode='after')
+    def verify_api_key(self):
+        if self.GOOGLE_API_KEY or self.OPENAI_API_KEY:
+            return self
+
+        raise ValueError('At least one API key must be provided.')
+
+try:
+    settings = Settings()
+except Exception as e:
+    log.error(f'Error loading configuration: {e}')
+    sys.exit(1)
