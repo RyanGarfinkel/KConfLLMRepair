@@ -58,13 +58,13 @@ workspace/
 ## LLM Agent Repair
 
 ### Tools
-| Tool                  | Args               | Description                                               |   |   |
-|-----------------------|--------------------|-----------------------------------------------------------|---|---|
-| search_patch          | regex: str         | Returns pattern matches in the patch file.                |   |   |
-| search_klocalizer_log | regex: str         | Returns pattern matches in the latest klocalizer log.     |   |   |
-| search_build_log      | regex: str         | Returns pattern matches in the latest build log.          |   |   |
-| search_qemu_log       | regex: str         | Returns pattern matches in the latest QEMU log.           |   |   |
-| search_base_config    | options: list[str] | Returns the values of the options from the base config.   |   |   |
-| search_latest_config  | options: list[str] | Returns the values of the options from the latest config. |   |   |
+| Tool                  | Args               | Description                                               |
+|-----------------------|--------------------|-----------------------------------------------------------|
+| search_patch          | regex: str         | Returns pattern matches in the patch file.                |
+| search_klocalizer_log | regex: str         | Returns pattern matches in the latest klocalizer log.     |
+| search_build_log      | regex: str         | Returns pattern matches in the latest build log.          |
+| search_qemu_log       | regex: str         | Returns pattern matches in the latest QEMU log.           |
+| search_base_config    | options: list[str] | Returns the values of the options from the base config.   |
+| search_latest_config  | options: list[str] | Returns the values of the options from the latest config. |
 
 ### How to Run
