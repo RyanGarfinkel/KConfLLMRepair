@@ -214,7 +214,7 @@ class AgentTools:
         if not self.kernel.run_klocalizer(dir, define, undefine):
             return [f'Error. KLocalizer failed to run. Check the log for details.', self.__tail(f"{dir}/klocalizer.log")]
 
-        if not self.kernel.build(dir):
+        if not self.kernel.build(f'{dir}/klocalizer.config', f'{dir}/build.log'):
             return [f'Error. Kernel build failed. Check the log for details.', self.__tail(f"{dir}/build.log")]
         
         if not booter.test(self.kernel, dir):

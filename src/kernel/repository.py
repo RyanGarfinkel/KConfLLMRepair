@@ -2,7 +2,21 @@ from src.config import settings
 from src.utils import log
 from git import Repo
 import shutil
+import signal
+import sys
 import os
+
+active_kernels = []
+def handler(a, b):
+
+    global active_kernels
+    
+    for kernel in active_kernels:
+        kernel.cleanup()
+    
+    sys.exit(0)
+
+signal.signal(signal.SIGINT, handler)
 
 class KernelRepo:
 
@@ -16,6 +30,8 @@ class KernelRepo:
         self.path = f'{settings.WORKTREE_DIR}/{commit[:12]}'
         
         self.__create_worktree()
+
+        active_kernels.append(self)
 
     def __load_main_repo(self):
         if KernelRepo.__main_repo is None:
@@ -34,13 +50,11 @@ class KernelRepo:
 
         log.success(f'Worktree for commit {self.commit} created successfully.')
 
-    def make_patch(self, output_dir: str, commit_window: int) -> (bool, str | None):
-
-        log.info(f'Creating patch for commit {self.commit}.')
+    def make_patch(self, output_dir: str) -> tuple[bool, str | None]:
 
         end = self.repo.head.commit
 
-        commits = list(self.repo.iter_commits(end, max_count=commit_window))
+        commits = list(self.repo.iter_commits(end, max_count=settings.COMMIT_WINDOW))
 
         if not commits:
             log.info(f'No commits found for commit {self.commit}. Cannot create patch.')
@@ -57,8 +71,6 @@ class KernelRepo:
 
         with open(patch_file, 'w') as f:
             f.write(patch)
-
-        log.success(f'Patch for commit {self.commit} created successfully at {patch_file}.')
 
         return True, start.hexsha
 

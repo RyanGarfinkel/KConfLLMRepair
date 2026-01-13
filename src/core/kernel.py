@@ -1,48 +1,84 @@
-from src.kernel import KernelRepo, KConfig, builder
 from src.tools.klocalizer import klocalizer
+from src.kernel import KernelRepo, builder
+from src.tools.booter import booter
 from src.config import settings
+from src.utils import log
 import shutil
 import os
 
 class Kernel:
 
-    __BASE_CONFIG: KConfig | None = None
-
     def __init__(self, commit: str):
 
-        self.__load_base_config()
         self.repo = KernelRepo(commit)
+
+    def create_patch(self, output_dir: str) -> tuple[bool, str | None]:
         
-        Kernel.__BASE_CONFIG.cp(f'{self.repo.path}/.config')
+        log.info(f'Creating patch for kernel {self.repo.commit}...')
 
-    @property
-    def is_built(self) -> bool:
-        return os.path.exists(f'{self.repo.path}/{settings.BZIMAGE}')
+        success, start_commit = self.repo.make_patch(output_dir)
 
-    @property
-    def is_usable(self) -> bool:
-        return os.path.exists(self.repo.path)
+        if not success:
+            log.error('Failed to create patch for kernel.')
+            return False, None
 
-    def __load_base_config(self):
-        if Kernel.__BASE_CONFIG is None:
-            Kernel.__BASE_CONFIG = KConfig(f'{settings.BASE_CONFIG}')
+        log.success('Patch created successfully.')
 
-    def create_patch(self, output_dir: str, commit_window: int) -> (bool, str | None):
-        
-        return self.repo.make_patch(output_dir, commit_window)
+        return success, start_commit
     
-    def run_klocalizer(self, output_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+    def load_config(self, config: str) -> bool:
 
-        config = klocalizer.run(self.repo, output_dir, define, undefine)
+        log.info(f'Loading configuration for kernel {self.repo.commit}...')
+
+        if not os.path.exists(config):
+            log.error(f'Configuration file {config} does not exist.')
+            return False
         
-        if config is not None:
-            config.cp(f'{output_dir}/klocalizer.config')
+        shutil.copy(config, f'{self.repo.path}/.config')
 
-        return config is not None
+        return True
 
-    def build(self, output_dir: str) -> bool:
+    def run_klocalizer(self, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
 
-        return builder.build(self.repo, output_dir)
+        log.info(f'Running KLocalizer for kernel {self.repo.commit}...')
+
+        self.load_config(settings.BASE_CONFIG)
+        
+        if klocalizer.run(self.repo, sample_dir, define, undefine):
+            log.success(f'KLocalizer completed successfully.')
+            return True
+        
+        log.error(f'KLocalizer failed.')
+
+        return False
+
+    def build(self, config: str, log_file: str) -> bool:
+
+        self.load_config(config)
+
+        log.info(f'Building kernel {self.repo.commit}...')
+
+        built_successfully = builder.build(self.repo, log_file)
+
+        if built_successfully:
+            log.success('Kernel built successfully.')
+        else:
+            log.error('Kernel build failed. Check log for details.')
+
+        return built_successfully
+
+    def boot(self, log_file: str) -> bool:
+
+        log.info(f'Running QEMU test on kernel {self.repo.commit}...')
+
+        boot_success = booter.test(self, log_file)
+
+        if boot_success:
+            log.success('Kernel booted successfully in QEMU.')
+        else:
+            log.error('Kernel failed to boot in QEMU. Check log for details.')
+
+        return boot_success
     
     def cleanup(self):
         

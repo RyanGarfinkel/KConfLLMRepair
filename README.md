@@ -25,7 +25,7 @@ OPENAI_API_KEY=your-api-key-here
 ### 3. Create Base Configuration
 Run the following to create the base configuration in the ```config/``` directory. This base configuration is the defconfig merged with the kvm guest configuration for QEMU testing. Afterwards, the script builds and tests the configuration to confirm that it boots.
 ```bash
-sh scripts/create_base.sh
+sh scripts/create-base.sh
 ```
 
 You may use any base configuration as long as it follows the following format. It will be assumed that ```base.config``` is a bootable configuration. The ```.log``` files will be created by the script, but are not needed/used elsewhere.
@@ -39,14 +39,14 @@ config/
 ### 4. Generating Samples
 Run the following to generate smaple configurations. You may pass in the following options to customize the number of samples generated and the commit size of each patch file created. By default, ```n=10``` and ```commit-window=250```.
 ```bash
-python3 -m src.scripts.sample --n 10 --commit-window 250
+python3 -m src.scripts.generate_samples --n 10 --commit-window 250
 ```
 
-The following files will be created by the script. ```summary.csv``` will contain metadata for each sample. Please keep these samples, as they are utilized during the Agent repair.
+The following files will be created by the script. ```summary.json``` will contain information for each sample generated. Please keep these samples, as they are utilized during the Agent repair.
 ```
 workspace/
 ├── samples
-│   ├── summary.csv
+│   ├── summary.json
 │   ├── sample_#/
 │   │   ├── build.log
 │   │   ├── changes.patch
@@ -58,13 +58,14 @@ workspace/
 ## LLM Agent Repair
 
 ### Tools
-| Tool                  | Args               | Description                                               |
-|-----------------------|--------------------|-----------------------------------------------------------|
-| search_patch          | regex: str         | Returns pattern matches in the patch file.                |
-| search_klocalizer_log | regex: str         | Returns pattern matches in the latest klocalizer log.     |
-| search_build_log      | regex: str         | Returns pattern matches in the latest build log.          |
-| search_qemu_log       | regex: str         | Returns pattern matches in the latest QEMU log.           |
-| search_base_config    | options: list[str] | Returns the values of the options from the base config.   |
-| search_latest_config  | options: list[str] | Returns the values of the options from the latest config. |
+| Tool                  | Args                                   | Description                                               |
+|-----------------------|----------------------------------------|-----------------------------------------------------------|
+| search_patch          | regex: str                             | Returns pattern matches in the patch file.                |
+| search_klocalizer_log | regex: str                             | Returns pattern matches in the latest klocalizer log.     |
+| search_build_log      | regex: str                             | Returns pattern matches in the latest build log.          |
+| search_qemu_log       | regex: str                             | Returns pattern matches in the latest QEMU log.           |
+| search_base_config    | options: list[str]                     | Returns the values of the options from the base config.   |
+| search_latest_config  | options: list[str]                     | Returns the values of the options from the latest config. |
+| apply_and_test        | define: list[str], undefine: list[str] | Reruns klocalizer with changes then tests if it boots.    |
 
 ### How to Run

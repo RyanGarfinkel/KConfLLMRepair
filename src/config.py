@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     EXPERIMENT_DIR: str
     WORKTREE_DIR: str
 
-    # Jobs
+    # Runtime Arguments
+    COMMIT_WINDOW: int = 250
     JOBS: int = 8
 
     # Dependency
@@ -32,11 +33,23 @@ class Settings(BaseSettings):
         env_file='.env',
     )
 
+    # Scripts
     @property
     def QEMU_TEST_SCRIPT(self) -> str:
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'qemu-test.sh')
         return os.path.abspath(path)
+    
+    @property
+    def BUILD_SCRIPT(self) -> str:
+        path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'build-kernel.sh')
+        return os.path.abspath(path)
+    
+    @property
+    def RUN_KLOCALIZER_SCRIPT(self) -> str:
+        path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-klocalizer.sh')
+        return os.path.abspath(path)
 
+    # Validation
     @field_validator('SAMPLE_DIR', 'EXPERIMENT_DIR', 'WORKTREE_DIR')
     def validate(cls, v: str) -> str:
         os.makedirs(v, exist_ok=True)
