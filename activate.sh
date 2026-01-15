@@ -18,23 +18,28 @@ export PROJECT_ROOT=$ROOT
 
 # Core Settings
 export KERNEL_SRC=$ROOT/workspace/kernel
-export BASE_CONFIG=$ROOT/config/base.config
+export BASE_CONFIG=$ROOT/config/base.config ###
+export UPSTREAM_APPARMOR_KASAN_CONFIG=$ROOT/workspace/tools/syzkaller/dashboard/config/linux/upstream-apparmor-kasan.config
 export SAMPLE_DIR=$ROOT/workspace/samples
 export EXPERIMENT_DIR=$ROOT/workspace/experiments
 export WORKTREE_DIR=$ROOT/workspace/worktrees
+export SYZ_KCONF=$ROOT/workspace/tools/syzkaller/bin/syz-kconf
 
 # Build Settings
 export CROSS_COMPILE=x86_64-linux-gnu-
 export DEBIAN_IMG=$ROOT/workspace/images/debian.raw
+export MAIN_YML=$ROOT/workspace/tools/syzkaller/dashboard/config/linux/main.yml
+export GOROOT=/usr/local/go
 export ARCH=x86_64
 
 # Tool Settings
 export SUPERC_PATH=$HOME/.local/bin/superc_linux.sh
+export SYZ_KCONF=$ROOT/workspace/tools/syzkaller/bin/syz-kconf
 export Z3_SRC=$ROOT/workspace/tools/z3
 
 # Dependency Settings
 export CLASSPATH=$HOME/.local/share/superc/superc.jar:$HOME/.local/share/superc/xtc.jar:$HOME/.local/share/superc/JavaBDD/javabdd-1.0b2.jar:/usr/share/java/org.sat4j.core.jar:/usr/share/java/json.jar:$Z3_SRC/build/com.microsoft.z3.jar:$CLASSPATH
 export LD_LIBRARY_PATH=$Z3_SRC/build:$LD_LIBRARY_PATH
-export PATH=/usr/lib/ccache:$PATH
+export PATH=/usr/lib/ccache:$GOROOT/bin:$PATH
 
 echo '[SUCCESS] Environment variables set successfully.'

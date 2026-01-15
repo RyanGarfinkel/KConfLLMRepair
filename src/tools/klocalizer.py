@@ -10,7 +10,7 @@ class KLocalizer:
 
     def run(self, repo: KernelRepo, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
 
-        cmd = ['bash', settings.RUN_KLOCALIZER_SCRIPT, repo.path, f'{sample_dir}/changes.patch', f'{sample_dir}/klocalizer.log']
+        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, repo.path, f'{sample_dir}/changes.patch', f'{sample_dir}/klocalizer.log']
 
         for opt in define:
             cmd.extend(['--define', opt])

@@ -1,39 +1,59 @@
-from pydantic import field_validator, model_validator, ValidationInfo
+from pydantic import field_validator, model_validator, ValidationInfo, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from src.utils import log
 import sys
 import os
 
-class Settings(BaseSettings):
+# class SyzkallerSettings(BaseModel):
 
-    # Core 
+    # SYZ_KCONF: str
+    # MAIN_YML: str
+    # UPSTREAM_APPARMOR_KASAN_CONFIG: str
+
+class KernelSettings(BaseModel):
+
     KERNEL_SRC: str
-    BASE_CONFIG: str
+    SUPERC_PATH: str
+    BZIMAGE: str = 'arch/x86/boot/bzImage'
+
+    @field_validator('KERNEL_SRC', 'SUPERC_PATH')
+    def validate_kernel_exists(cls, v: str, info: ValidationInfo) -> str:
+        if not os.path.exists(v):
+            raise ValueError(f'{info.field_name} path does not exist: {v}')
+
+        return v
+
+class RuntimeSettings(BaseModel):
+
+    COMMIT_WINDOW: int = 250
+    JOBS: int = 8
+    MAX_THREADS: int = 1
     SAMPLE_DIR: str
     EXPERIMENT_DIR: str
     WORKTREE_DIR: str
+    BASE_CONFIG: str
 
-    # Runtime Arguments
-    COMMIT_WINDOW: int = 250
-    JOBS: int = 8
+    @field_validator('SAMPLE_DIR', 'EXPERIMENT_DIR', 'WORKTREE_DIR')
+    def validate(cls, v: str) -> str:
+        os.makedirs(v, exist_ok=True)
 
-    # Dependency
-    SUPERC_PATH: str
-    ARCH: str
+        return v
 
-    # API Keys
+class AgentSettings(BaseModel):
+
     GOOGLE_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
+    MAX_ITERATIONS: int = 5
 
-    # Local Paths
-    BZIMAGE: str = 'arch/x86/boot/bzImage'
+    @model_validator(mode='after')
+    def verify_api_key(self):
+        if self.GOOGLE_API_KEY or self.OPENAI_API_KEY:
+            return self
 
-    model_config = SettingsConfigDict(
-        env_file_encoding='utf-8',
-        env_file='.env',
-    )
+        raise ValueError('At least one API key must be provided.')
 
-    # Scripts
+class ScriptSettings(BaseModel):
+
     @property
     def QEMU_TEST_SCRIPT(self) -> str:
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'qemu-test.sh')
@@ -49,26 +69,37 @@ class Settings(BaseSettings):
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-klocalizer.sh')
         return os.path.abspath(path)
 
-    # Validation
-    @field_validator('SAMPLE_DIR', 'EXPERIMENT_DIR', 'WORKTREE_DIR')
-    def validate(cls, v: str) -> str:
-        os.makedirs(v, exist_ok=True)
+class Settings(BaseSettings):
 
-        return v
+    kernel: KernelSettings = Field(default_factory=KernelSettings)
+    runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
+    agent: AgentSettings = Field(default_factory=AgentSettings)
+    scripts: ScriptSettings = Field(default_factory=ScriptSettings)
 
-    @field_validator('KERNEL_SRC', 'BASE_CONFIG', 'SUPERC_PATH')
-    def validate_kernel_exists(cls, v: str, info: ValidationInfo) -> str:
-        if not os.path.exists(v):
-            raise ValueError(f'{info.field_name} path does not exist: {v}')
+    model_config = SettingsConfigDict(
+        env_file_encoding='utf-8',
+        env_file='.env',
+        extra='allow',
+        case_sensitive=True,
+    )
+    
+    @model_validator(mode='before')
+    def nest_flat_env_vars(cls, values: dict) -> dict:
+        
+        src = os.environ.copy()
+        src.update(values)
+        
+        kernel_data = {k: src.get(k) for k in KernelSettings.model_fields if k in src}
+        runtime_data = {k: src.get(k) for k in RuntimeSettings.model_fields if k in src}
+        agent_data = {k: src.get(k) for k in AgentSettings.model_fields if k in src}
+        scripts_data = {k: src.get(k) for k in ScriptSettings.model_fields if k in src}
 
-        return v
-
-    @model_validator(mode='after')
-    def verify_api_key(self):
-        if self.GOOGLE_API_KEY or self.OPENAI_API_KEY:
-            return self
-
-        raise ValueError('At least one API key must be provided.')
+        return {
+            'kernel': kernel_data,
+            'runtime': runtime_data,
+            'agent': agent_data,
+            'scripts': scripts_data,
+        }
 
 try:
     settings = Settings()

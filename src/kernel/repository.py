@@ -6,12 +6,12 @@ import signal
 import sys
 import os
 
-active_kernels = []
+active_kernels = {}
 def handler(a, b):
 
     global active_kernels
     
-    for kernel in active_kernels:
+    for kernel in active_kernels.values():
         kernel.cleanup()
     
     sys.exit(0)
@@ -20,30 +20,46 @@ signal.signal(signal.SIGINT, handler)
 
 class KernelRepo:
 
-    __main_repo: Repo | None = None
+    __main_repo: Repo = Repo(settings.kernel.KERNEL_SRC)
 
     def __init__(self, commit: str):
 
-        self.__load_main_repo()
-
         self.commit = commit
-        self.path = f'{settings.WORKTREE_DIR}/{commit[:12]}'
+        self.path = f'{settings.runtime.WORKTREE_DIR}/{commit[:12]}'
         
         self.__create_worktree()
 
-        active_kernels.append(self)
+        active_kernels[self.commit] = self
 
-    def __load_main_repo(self):
-        if KernelRepo.__main_repo is None:
-            KernelRepo.__main_repo = Repo(settings.KERNEL_SRC)
+    @staticmethod
+    def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
+        
+        repo = KernelRepo.__main_repo
 
+        if start_commit:
+            end = repo.commit(start_commit)
+        else:
+            end = repo.head.commit
+
+        commits = [end.hexsha]
+
+        for _ in range(n - 1):
+
+            start = list(repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW))[-1]
+            start = start.parents[0]
+
+            commits.append(start.hexsha)
+            end = start
+
+        return commits
+    
     def __create_worktree(self):
-
-        log.info(f'Creating worktree for commit {self.commit}.')
 
         if os.path.exists(self.path):
             log.info(f'Worktree for commit {self.commit} already exists. Cleaning up before creating a new one.')
             self.cleanup()
+
+        log.info(f'Creating worktree for commit {self.commit}.')
 
         KernelRepo.__main_repo.git.worktree('add', '-f', self.path, self.commit)
         self.repo = Repo(self.path)
@@ -54,7 +70,7 @@ class KernelRepo:
 
         end = self.repo.head.commit
 
-        commits = list(self.repo.iter_commits(end, max_count=settings.COMMIT_WINDOW))
+        commits = list(self.repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW))
 
         if not commits:
             log.info(f'No commits found for commit {self.commit}. Cannot create patch.')

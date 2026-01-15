@@ -2,37 +2,65 @@ from langchain_core.tools import StructuredTool
 from src.config import settings
 from src.kernel import KConfig
 from src.models import Sample
-from src.tools import booter
+from src.tools import qemu
+from src.core import Kernel
 from src.utils import log
 import shutil
 import os
 import re
 
-class AgentTools:
+class Tools:
 
-    def __init__(self, kernel: 'Kernel', sample: Sample):
+    __BASE_CONFIG = KConfig(settings.runtime.BASE_CONFIG)
 
-        self.kernel = kernel
-        self.output_dir = f'{settings.EXPERIMENT_DIR}/sample_{sample.id}'
-        self.try_count = 1
+    def __init__(self, sample: Sample):
 
-        if not os.path.exists(f'{settings.SAMPLE_DIR}/sample_{sample.id}'):
-            raise Exception(f'Sample directory {self.output_dir} does not exist. Cannot initialize AgentTools for sample {sample.id}.')
+        self.output_dir = f'{settings.runtime.EXPERIMENT_DIR}/sample_{sample.id}'
+        self.kernel = Kernel(sample.end_commit)
 
+        if not os.path.exists(f'{settings.runtime.SAMPLE_DIR}/sample_{sample.id}'):
+            raise Exception(f'Sample directory {self.output_dir} does not exist. Cannot initialize Tools for sample {sample.id}.')
+        
         os.makedirs(self.output_dir, exist_ok=True)
         shutil.copytree(sample.dir, f'{self.output_dir}/try_0', dirs_exist_ok=True)
 
-        self.patch_file = f'{self.output_dir}/try_0/changes.patch'
-        if not os.path.exists(self.patch_file):
-            raise Exception(f'Patch file {self.patch_file} does not exist. Cannot initialize AgentTools for sample {sample.id}.')
-
-        self.base_config = KConfig(settings.BASE_CONFIG)
+        self.tools_used = []
         self.succeeded = False
+        self.attempt = 1
+
+    @property
+    def patch_file(self) -> str:
+        return f'{self.output_dir}/try_0/changes.patch'
 
     @property
     def config(self) -> str:
-        return f'{self.output_dir}/try_{self.try_count - 1}/klocalizer.config'
+        return f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.config'
+
+    @property
+    def latest_log(self) -> str:
+
+        # QEMU log
+        qemu_log = f'{self.output_dir}/try_{self.attempt - 1}/qemu.log'
+        if os.path.exists(qemu_log):
+            with open(qemu_log, 'r') as f:
+                return ' '.join(self.__truncate(f.readlines()))
+        
+        # Build log
+        build_log = f'{self.output_dir}/try_{self.attempt - 1}/build.log'
+        if os.path.exists(build_log):
+            with open(build_log, 'r') as f:
+                return ' '.join(self.__truncate(f.readlines()))
+            
+        # KLocalizer log
+        klocalizer_log = f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.log'
+        if os.path.exists(klocalizer_log):
+            with open(klocalizer_log, 'r') as f:
+                return ' '.join(self.__truncate(f.readlines()))
+            
+        return 'No logs available for the latest try.'
     
+    # Agent Tools
+
     def search_patch(self, regex: str) -> list[str]:
         """
         Search for lines in the patch that match the given regex pattern.
@@ -43,8 +71,6 @@ class AgentTools:
             list[str]: A list of lines from the patch file that match the regex pattern.
         """
 
-        log.info(f'Agent is searching for pattern "{regex}" in the patch file.')
-
         with open(self.patch_file, 'r') as f:
             lines = f.readlines()
 
@@ -52,8 +78,16 @@ class AgentTools:
             matches = [line.strip() for line in lines if re.search(regex, line)]
         except re.error as e:
             return [f'Error. Invalid regular expression: {e}']
+        
+        matches = self.__truncate(matches)
 
-        return self.__truncate(matches)
+        self.tools_used.append({
+            'tool': 'search_patch',
+            'regex': regex,
+            'matches': matches,
+        })
+
+        return matches
 
     def search_klocalizer_log(self, regex: str) -> list[str]:
         """
@@ -65,9 +99,7 @@ class AgentTools:
             list[str]: A list of lines from the KLocalizer log file that match the regex pattern.
         """
 
-        log.info(f'Agent is searching for pattern "{regex}" in the klocalizer log file.')
-
-        klocalizer_log = f'{self.output_dir}/try_{self.try_count - 1}/klocalizer.log'
+        klocalizer_log = f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.log'
 
         if not os.path.exists(klocalizer_log):
             return ['Error. There was no KLocalizer log for the latest try.']
@@ -79,8 +111,16 @@ class AgentTools:
             matches = [line.strip() for line in lines if re.search(regex, line)]
         except re.error as e:
             return [f'Error. Invalid regular expression: {e}']
+        
+        matches = self.__truncate(matches)
 
-        return self.__truncate(matches)
+        self.tools_used.append({
+            'tool': 'search_klocalizer_log',
+            'regex': regex,
+            'matches': matches,
+        })
+
+        return matches
 
     def search_build_log(self, regex: str) -> list[str]:
         """
@@ -92,9 +132,7 @@ class AgentTools:
             list[str]: A list of lines from the build log file that match the regex pattern.
         """
 
-        log.info(f'Agent is searching for pattern "{regex}" in the build log file.')
-
-        build_log = f'{self.output_dir}/try_{self.try_count - 1}/build.log'
+        build_log = f'{self.output_dir}/try_{self.attempt - 1}/build.log'
 
         if not os.path.exists(build_log):
             return ['Error. There was no build log for the latest try.']
@@ -107,7 +145,15 @@ class AgentTools:
         except re.error as e:
             return [f'Error. Invalid regular expression: {e}']
 
-        return self.__truncate(matches)
+        matches = self.__truncate(matches)
+
+        self.tools_used.append({
+            'tool': 'search_build_log',
+            'regex': regex,
+            'matches': matches,
+        })
+
+        return matches
     
     def search_qemu_log(self, regex: str) -> list[str]:
         """
@@ -119,9 +165,7 @@ class AgentTools:
             list[str]: A list of lines from the QEMU boot log file that match the regex pattern.
         """
 
-        log.info(f'Agent is searching for pattern "{regex}" in the QEMU boot log file.')
-
-        qemu_log = f'{self.output_dir}/try_{self.try_count - 1}/qemu.log'
+        qemu_log = f'{self.output_dir}/try_{self.attempt - 1}/qemu.log'
 
         if not os.path.exists(qemu_log):
             return ['Error. There was no QEMU boot log for the latest try.']
@@ -134,7 +178,15 @@ class AgentTools:
         except re.error as e:
             return [f'Error. Invalid regular expression: {e}']
 
-        return self.__truncate(matches)
+        matches = self.__truncate(matches)
+
+        self.tools_used.append({
+            'tool': 'search_qemu_log',
+            'regex': regex,
+            'matches': matches,
+        })
+
+        return matches
 
     def search_base_config(self, options: list[str]) -> list[str]:
         """
@@ -146,15 +198,19 @@ class AgentTools:
             list[str]: A list of values of the options searched for that were found in the base config file.
         """
 
-        log.info(f'Agent is searching for options {options} in the base config file.')
-
         values = []
         for option in options:
-            value = self.base_config.options.get(option, None)
+            value = Tools.__BASE_CONFIG.options.get(option, None)
             if value is not None:
                 values.append(f'{option}={value}')
             else:
                 values.append(f'{option} not found in base config.')
+
+        self.tools_used.append({
+            'tool': 'search_base_config',
+            'options': options,
+            'values': values,
+        })
 
         return values
 
@@ -168,9 +224,7 @@ class AgentTools:
             list[str]: A list of values of the options searched for that were found in the KLocalizer config file.
         """
 
-        log.info(f'Agent is searching for options {options} in the latest KLocalizer config file.')
-
-        klocalizer_config = f'{self.output_dir}/try_{self.try_count - 1}/klocalizer.config'
+        klocalizer_config = f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.config'
 
         if not os.path.exists(klocalizer_config):
             return ['Error. There was no KLocalizer config file for the latest try.']
@@ -184,6 +238,12 @@ class AgentTools:
                 values.append(f'{option}={value}')
             else:
                 values.append(f'{option} not found in KLocalizer config.')
+
+        self.tools_used.append({
+            'tool': 'search_latest_config',
+            'options': options,
+            'values': values,
+        })
 
         return values
 
@@ -202,44 +262,59 @@ class AgentTools:
         if self.succeeded:
             return ['The agent has already succeeded. No further changes are needed.']
 
-        log.info('Agent is applying changes to the kernel configuration.')
+        try_dir = f'{self.output_dir}/try_{self.attempt}'
+        os.makedirs(try_dir, exist_ok=True)
 
-        dir = f'{self.output_dir}/try_{self.try_count}'
-        os.makedirs(dir, exist_ok=True)
-        shutil.copy(self.patch_file, f'{dir}/changes.patch')
-        self.try_count += 1
-
-        self.base_config.cp(f'{self.kernel.repo.path}/.config')
-
-        if not self.kernel.run_klocalizer(dir, define, undefine):
-            return [f'Error. KLocalizer failed to run. Check the log for details.', self.__tail(f"{dir}/klocalizer.log")]
-
-        if not self.kernel.build(f'{dir}/klocalizer.config', f'{dir}/build.log'):
-            return [f'Error. Kernel build failed. Check the log for details.', self.__tail(f"{dir}/build.log")]
+        shutil.copy(self.patch_file, f'{try_dir}/changes.patch')
         
-        if not booter.test(self.kernel, dir):
-            return [f'Error. QEMU boot failed. Check the log for details.', self.__tail(f"{dir}/qemu.log")]
+        self.attempt += 1
 
-        self.succeeded = True   
+        self.tools_used.append({
+            'tool': 'apply_and_test',
+            'define': define,
+            'undefine': undefine,
+            'success': False
+        })
+
+        if not self.kernel.run_klocalizer(try_dir, define, undefine):
+            return [f'Error. KLocalizer failed to run. Check the log for details.', self.__tail(f"{try_dir}/klocalizer.log")]
+
+        if not self.kernel.build(f'{try_dir}/klocalizer.config', f'{try_dir}/build.log'):
+            return [f'Error. Kernel build failed. Check the log for details.', self.__tail(f"{try_dir}/build.log")]
+        
+        if not self.kernel.boot(f'{try_dir}/qemu.log'):
+            return [f'Error. QEMU boot failed. Check the log for details.', self.__tail(f"{try_dir}/qemu.log")]
+
+        self.succeeded = True  
+        self.tools_used[-1]['success'] = True
 
         return [f'Success. Kernel built and booted successfully. You may finish now.']
-
-    def __tail(self, file_path: str, n: int = 10) -> str:
+        
+    def __tail(self, file_path: str) -> str:
+        if not os.path.exists(file_path):
+            return 'No log available.'
+        
         with open(file_path, 'r') as f:
             lines = f.readlines()
-            return ''.join(lines[-n:])
-    
-    def __truncate(self, matches: list[str], limit: int = 20) -> list[str]:
-        if len(matches) > limit:
-            amt = len(matches) - limit
-            print(f'Found {len(matches)} matches, truncating to the last {limit} lines. ({amt} lines truncated)')
-            return matches[-limit:] + [f'... (truncated {amt} lines)']
         
-        print(f'Found {len(matches)} matches, no truncation needed.')
-        return matches
+        return '\n'.join(self.__truncate(lines))
+    
+    def __truncate(self, items: list[str]) -> list[str]:
+        
+        limit = 20
 
-    def get_tools(self) -> list[callable]:
+        if len(items) > limit:
+            return items[-limit:] + [f'... (truncated {len(items) - limit} lines)']
+        
+        return items
+
+    def get_tools(self) -> list[StructuredTool]:
         return [
+            StructuredTool.from_function(
+                func=self.apply_and_test,
+                name='apply_and_test',
+                description=self.apply_and_test.__doc__
+            ),
             StructuredTool.from_function(
                 func=self.search_patch,
                 name='search_patch',
@@ -270,9 +345,4 @@ class AgentTools:
                 name='search_latest_config',
                 description=self.search_latest_config.__doc__
             ),
-            StructuredTool.from_function(
-                func=self.apply_and_test,
-                name='apply_and_test',
-                description=self.apply_and_test.__doc__
-            )
         ]

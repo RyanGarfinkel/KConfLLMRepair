@@ -11,7 +11,7 @@ sudo apt-get install -y \
      build-essential make gcc g++ \
      flex bison bc \
      libssl-dev libelf-dev libncurses-dev dwarves \
-     python3 python3-dev python3-pip pipx. lz4 \
+     python3 python3-dev python3-pip pipx lz4 \
      git wget unzip xz-utils lftp default-jdk \
      openjdk-8-jdk libz3-java libjson-java sat4j \
      qemu-system-x86 libdw-dev ccache \
@@ -39,7 +39,8 @@ else
     echo '[INFO] Linux Kernel already cloned at workspace/kernel'
     echo '[INFO] Pulling latest changes...'
     cd workspace/kernel
-    git pull origin master
+    git fetch origin
+    git reset --hard origin/master
     echo '[SUCCESS] Linux Kernel updated successfully.'
     cd $ROOT
 fi
@@ -53,7 +54,36 @@ else
     echo '[INFO] Debian image already exists at workspace/images/debian.raw'
 fi
 
-# TODO: Syzkaller Installation
+# Go Installation
+if ! command -v go &> /dev/null; then
+    echo '[INFO] Installing Go...'
+
+    GO_VERSION=1.24.4
+    GO_ARCH=amd64
+
+    wget https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz -O go.tar.gz
+    sudo tar -C /usr/local -xzf go.tar.gz
+    rm go.tar.gz
+
+    echo '[SUCCESS] Go installed successfully.'
+else
+    echo '[INFO] Go is already installed.'
+fi
+
+# Syzkaller Installation & Build
+if [ ! -d 'workspace/tools/syzkaller' ]; then
+    echo '[INFO] Cloning and building Syzkaller...'
+    git clone --depth 1 https://github.com/google/syzkaller.git workspace/tools/syzkaller
+else
+    echo '[INFO] Syzkaller already exists at workspace/tools/syzkaller'
+fi
+
+export GOROOT=/usr/local/go
+export PATH=$PATH:$GOROOT/bin
+
+cd workspace/tools/syzkaller
+make kconf
+cd $ROOT
 
 # Z3 Installation
 if [ ! -d 'workspace/tools/z3' ]; then

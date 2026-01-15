@@ -1,6 +1,6 @@
 from src.tools.klocalizer import klocalizer
 from src.kernel import KernelRepo, builder
-from src.tools.booter import booter
+from src.tools.qemu import qemu
 from src.config import settings
 from src.utils import log
 import shutil
@@ -11,6 +11,11 @@ class Kernel:
     def __init__(self, commit: str):
 
         self.repo = KernelRepo(commit)
+
+    @staticmethod
+    def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
+
+        return KernelRepo.get_sample_ends(n, start_commit)
 
     def create_patch(self, output_dir: str) -> tuple[bool, str | None]:
         
@@ -40,12 +45,14 @@ class Kernel:
 
     def run_klocalizer(self, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
 
-        log.info(f'Running KLocalizer for kernel {self.repo.commit}...')
+        if not self.load_config(settings.runtime.BASE_CONFIG):
+            return False
 
-        self.load_config(settings.BASE_CONFIG)
+        log.info(f'Running KLocalizer for kernel {self.repo.commit}...')
         
         if klocalizer.run(self.repo, sample_dir, define, undefine):
             log.success(f'KLocalizer completed successfully.')
+            shutil.copy(f'{self.repo.path}/.config', f'{sample_dir}/klocalizer.config')
             return True
         
         log.error(f'KLocalizer failed.')
@@ -71,7 +78,7 @@ class Kernel:
 
         log.info(f'Running QEMU test on kernel {self.repo.commit}...')
 
-        boot_success = booter.test(self, log_file)
+        boot_success = qemu.test(self, log_file)
 
         if boot_success:
             log.success('Kernel booted successfully in QEMU.')

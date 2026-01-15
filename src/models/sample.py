@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-import json
 from src.config import settings
+import json
 import os
 
 @dataclass
@@ -33,16 +33,16 @@ class Sample:
             'samples': data
         }
 
-        with open(f'{settings.SAMPLE_DIR}/summary.json', 'w') as f:
+        with open(f'{settings.runtime.SAMPLE_DIR}/summary.json', 'w') as f:
             json.dump(summary, f, indent=4)
 
     @staticmethod
     def get_samples(n: int) -> list['Sample']:
 
-        if not os.path.exists(f'{settings.SAMPLE_DIR}/summary.json'):
-            raise FileNotFoundError(f'{settings.SAMPLE_DIR}/summary.json not found')
+        if not os.path.exists(f'{settings.runtime.SAMPLE_DIR}/summary.json'):
+            raise FileNotFoundError(f'{settings.runtime.SAMPLE_DIR}/summary.json not found')
 
-        with open(f'{settings.SAMPLE_DIR}/summary.json', 'r') as f:
+        with open(f'{settings.runtime.SAMPLE_DIR}/summary.json', 'r') as f:
             data = json.load(f)
             
         samples = [Sample(**item) for item in data.get('samples', [])]
