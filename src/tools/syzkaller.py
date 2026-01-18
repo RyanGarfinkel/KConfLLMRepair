@@ -1,23 +1,22 @@
 from singleton_decorator import singleton
 from src.config import settings
+from src.utils import log
+import subprocess
+
 @singleton
 class Syzkaller:
 
-    def __get_kernel_version(self, kernel_src: str) -> str:
+    def run(self, kernel_src: str, output: str) -> bool:
 
-        with open(f'{kernel_src}/Makefile', 'r') as f:
-            for line in f:
-                if line.startswith('VERSION'):
-                    version = line.split('=')[1].strip()
-                elif line.startswith('PATCHLEVEL'):
-                    patchlevel = line.split('=')[1].strip()
-                elif line.startswith('SUBLEVEL'):
-                    sublevel = line.split('=')[1].strip()
-                elif line.startswith('EXTRAVERSION'):
-                    extraversion = line.split('=')[1].strip()
+        cmd = ['bash', settings.scripts.SYZ_KCONF_SCRIPT, kernel_src, output, settings.syzkconf.INSTANCE]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            log.error(f'Syzkaller failed with exit code {result.returncode}')
+            if result.stderr:
+                log.error(f'Stderr: {result.stderr}')
 
-        kernel_version = f"{version}.{patchlevel}.{sublevel}{extraversion}"
+        return result.returncode == 0
 
-        return kernel_version
-
+syzkaller = Syzkaller()
         

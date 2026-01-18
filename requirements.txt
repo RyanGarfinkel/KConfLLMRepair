@@ -1,4 +1,4 @@
-kmax==4.9.1rc1
+kmax==4.9.1rc2
 GitPython
 click
 dotenv

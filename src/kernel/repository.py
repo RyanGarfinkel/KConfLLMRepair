@@ -2,69 +2,48 @@ from src.config import settings
 from src.utils import log
 from git import Repo
 import shutil
-import signal
+import atexit
 import sys
 import os
 
 active_kernels = {}
-def handler(a, b):
+def handler():
 
     global active_kernels
     
-    for kernel in active_kernels.values():
-        kernel.cleanup()
-    
-    sys.exit(0)
+    for path in active_kernels.keys():
+        KernelRepo.cleanup(path)
 
-signal.signal(signal.SIGINT, handler)
+atexit.register(handler)
 
 class KernelRepo:
 
     __main_repo: Repo = Repo(settings.kernel.KERNEL_SRC)
 
-    def __init__(self, commit: str):
+    def __init__(self, kernel_src: str):
 
-        self.commit = commit
-        self.path = f'{settings.runtime.WORKTREE_DIR}/{commit[:12]}'
-        
-        self.__create_worktree()
+        self.repo = Repo(kernel_src)
+        self.path = kernel_src
 
-        active_kernels[self.commit] = self
+    def get_kernel_version(self) -> str:
 
-    @staticmethod
-    def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
-        
-        repo = KernelRepo.__main_repo
+        version = ''
+        patchlevel = ''
+        sublevel = ''
+        extraversion = ''
 
-        if start_commit:
-            end = repo.commit(start_commit)
-        else:
-            end = repo.head.commit
+        with open(f'{self.path}/Makefile', 'r') as f:
+            for line in f:
+                if line.startswith('VERSION'):
+                    version = line.split('=')[1].strip()
+                elif line.startswith('PATCHLEVEL'):
+                    patchlevel = line.split('=')[1].strip()
+                elif line.startswith('SUBLEVEL'):
+                    sublevel = line.split('=')[1].strip()
+                elif line.startswith('EXTRAVERSION'):
+                    extraversion = line.split('=')[1].strip()
 
-        commits = [end.hexsha]
-
-        for _ in range(n - 1):
-
-            start = list(repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW))[-1]
-            start = start.parents[0]
-
-            commits.append(start.hexsha)
-            end = start
-
-        return commits
-    
-    def __create_worktree(self):
-
-        if os.path.exists(self.path):
-            log.info(f'Worktree for commit {self.commit} already exists. Cleaning up before creating a new one.')
-            self.cleanup()
-
-        log.info(f'Creating worktree for commit {self.commit}.')
-
-        KernelRepo.__main_repo.git.worktree('add', '-f', self.path, self.commit)
-        self.repo = Repo(self.path)
-
-        log.success(f'Worktree for commit {self.commit} created successfully.')
+        return f'{version}.{patchlevel}.{sublevel}{extraversion}'
 
     def make_patch(self, output_dir: str) -> tuple[bool, str | None]:
 
@@ -90,22 +69,67 @@ class KernelRepo:
 
         return True, start.hexsha
 
-    def cleanup(self):
+    @staticmethod
+    def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
+        
+        repo = KernelRepo.__main_repo
 
+        if start_commit:
+            end = repo.commit(start_commit)
+        else:
+            end = repo.head.commit
+
+        commits = [end.hexsha]
+
+        for _ in range(n - 1):
+
+            start = list(repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW))[-1]
+            start = start.parents[0]
+
+            commits.append(start.hexsha)
+            end = start
+
+        return commits
+    
+    @staticmethod
+    def create_worktree(commit: str) -> str:
+
+        path = f'{settings.runtime.WORKTREE_DIR}/{commit[:12]}'
+        if os.path.exists(path):
+            log.info('Worktree already exists. Cleaning up before creating a new one.')
+            KernelRepo.cleanup(path)
+
+        log.info('Creating worktree.')
+
+        KernelRepo.__main_repo.git.worktree('add', '-f', path, commit)
+
+        log.success('Worktree created successfully.')
+        active_kernels[path] = True
+
+        return path
+    
+    @staticmethod
+    def cleanup(path: str):
+
+        if path == settings.kernel.KERNEL_SRC:
+            log.info('Cannot clean up the main kernel source directory. Skipping cleanup.')
+            return
+        
         try:
-            log.info(f'Cleaning up worktree for commit {self.commit}.')
+            log.info('Cleaning up worktree.')
 
-            KernelRepo.__main_repo.git.worktree('remove', '-f', self.path)
+            KernelRepo.__main_repo.git.worktree('remove', '-f', path)
+            if path in active_kernels:
+                del active_kernels[path]
         except Exception as e:
-            log.error(f'Error cleaning up worktree for commit {self.commit}: {e}')
+            log.error(f'Error cleaning up worktree: {e}')
         finally:
 
-            if not os.path.exists(self.path):
+            if not os.path.exists(path):
                 return
-
             try:
-                log.info(f'Removing worktree directory for commit {self.commit}.')
-                shutil.rmtree(self.path)
-                log.success(f'Worktree directory for commit {self.commit} removed successfully.')
+                log.info('Removing worktree directory.')
+                shutil.rmtree(path)
+                log.success('Worktree directory removed successfully.')
             except Exception as e:
-                log.error(f'Error removing worktree directory for commit {self.commit}: {e}')
+                log.error(f'Error removing worktree directory: {e}')

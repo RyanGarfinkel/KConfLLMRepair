@@ -2,60 +2,30 @@
 
 ## Getting Started
 
-### 1. Setup 
-The following script installs package dependencies, clones the linux-next kernel, Z3, SuperC, and kmax, and installs python packages needed to run the scripts. Run the following from the root of this repository: ```/KConfLLMRepair```
+The `setup.sh` script installs package dependencies, clones needed repositories, and installs python packages used to run the repair agent. The `activate.sh` script sets environment variables and the activates the python virtual environment.
 
 ```bash
-sh  setup.sh
-```
-
-### 2. Environment Configuration
-Run the following to setup the environment varibles and activate the python virutal environment.
-```bash
+bash setup.sh
 source activate.sh
 ```
 
-Please also create an```.env``` file in the ```/KConfLLMRepair``` directory for you Google Gemini or OpenAI API key. Then fill in the following information:
+Please the follow the [.env.template](.env.template) to setup you `.env` file
 
-```env
-GOOGLE_API_KEY=your-api-key-here
-OPENAI_API_KEY=your-api-key-here
-```
+## Agent Repair
 
-### 3. Create Base Configuration
-Run the following to create the base configuration in the ```config/``` directory. This base configuration is the defconfig merged with the kvm guest configuration for QEMU testing. Afterwards, the script builds and tests the configuration to confirm that it boots.
-```bash
-sh scripts/create-base.sh
-```
+### How to Run
 
-You may use any base configuration as long as it follows the following format. It will be assumed that ```base.config``` is a bootable configuration. The ```.log``` files will be created by the script, but are not needed/used elsewhere.
-```
-config/
-├── base.config # Must exist
-├── build.log 
-└── qemu.log
-```
-
-### 4. Generating Samples
-Run the following to generate smaple configurations. You may pass in the following options to customize the number of samples generated and the commit size of each patch file created. By default, ```n=10``` and ```commit-window=250```.
-```bash
-python3 -m src.scripts.generate_samples --n 10 --commit-window 250
-```
-
-The following files will be created by the script. ```summary.json``` will contain information for each sample generated. Please keep these samples, as they are utilized during the Agent repair.
-```
-workspace/
-├── samples
-│   ├── summary.json
-│   ├── sample_#/
-│   │   ├── build.log
-│   │   ├── changes.patch
-│   │   ├── klocalizer.config
-│   │   ├── klocalizer.log
-│   │   └── qemu.log
-```
-
-## LLM Agent Repair
+### Repair Options
+| Option             | Required? | Example                         | Description                                                                                                                  |
+|--------------------|-----------|---------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `--base`           | - [x]     | `--base base.config`            | Path to original configuration.                                                                                              |
+| `--modified`       | - [x]     | `--modified modified.config`    | Path to modified configuration.                                                                                              |
+| `--patch`          | - [x]     | `--patch changes.patch`         | Path to file/patch klocalizer should target.                                                                                 |
+| `--output`         | - [ ]     | `--output workspace/sample_0`   | Path where agent-repair directory will be created. By default, this is the current working directory.                        |
+| `--kernel-src`     | - [ ]     | `--kernel-src $KERNEL_WORKTREE` | Path to kernel source. By default, this looks for $KERNEL_SRC environment variable.                                          |
+| `--model`          | - [ ]     | `--model gpt-4o-mini`           | Sets which model the agent should use. If empty, gemini-3-pro-preview or                                                     |
+| `--max-iterations` | - [ ]     | `--max-iterations 10`           | Sets the maximum amount of tries the agent has to apply and test changes to the configuration. By default, this is set to 5. |
+| `--jobs`           | - [ ]     | `--jobs 8`                      | Sets the number of jobs to run when building the kernel image. By default, this is set to 8.                                 |
 
 ### Tools
 | Tool                  | Args                                   | Description                                               |
@@ -68,4 +38,19 @@ workspace/
 | search_latest_config  | options: list[str]                     | Returns the values of the options from the latest config. |
 | apply_and_test        | define: list[str], undefine: list[str] | Reruns klocalizer with changes then tests if it boots.    |
 
-### How to Run
+### Output Format
+The `boot-agent` directory will be created in the output directory sepecified in the command (or the current working directory). The repaired configuration will be saved in `.config`. Information about the tools used and iteration summaries will be stored in `summary.json`.
+```
+boot-agent/
+├── attempt_0/
+├── attempt_#/
+│   ├── build.log
+│   ├── changes.patch
+│   ├── changes.patch.kloc_targets
+│   ├── klocalizer.log
+│   ├── modified.config
+├── .config
+├── summary.json
+```
+
+## Generating Samples

@@ -1,6 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from singleton_decorator import singleton
-from src.config import settings
 from .logger import log
 from tqdm import tqdm
 
@@ -8,6 +7,7 @@ from tqdm import tqdm
 class Dispatcher:
 
     def run_tasks(self, tasks: list[callable], handle_as_completed: callable):
+        from src.config import settings
 
         with ThreadPoolExecutor(max_workers=settings.runtime.MAX_THREADS) as executor:
 

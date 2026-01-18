@@ -42,7 +42,7 @@ class Agent:
 
         for i in range(settings.agent.MAX_ITERATIONS):
 
-            log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS} for sample {sample.id}...')
+            log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS}...')
 
             system_prompt = context.system_prompt
             user_prompt = context.user_prompt(tools.latest_log)
@@ -50,7 +50,7 @@ class Agent:
             iter_summary = executor.iterate(system_prompt, user_prompt)
 
             if iter_summary is None:
-                print(f'No output from agent in iteration {i + 1}. Ending.')
+                log.info(f'No output from agent in iteration {i + 1}. Ending.')
                 break
 
             iter_summary.tools_used = tools.tools_used
@@ -59,7 +59,6 @@ class Agent:
             context.history.append(iter_summary)
 
         return AgentResult(
-            sample=str(sample.id),
             iterations=len(context.history),
             history=context.history,
             config=tools.config,

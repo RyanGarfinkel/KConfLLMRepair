@@ -7,8 +7,6 @@ import json
 @dataclass
 class AgentResult:
 
-    sample: str
-
     status: Literal['success', 'failure', 'max_iterations']
     iterations: int
 
@@ -16,27 +14,34 @@ class AgentResult:
     token_usage: int
 
     history: List[IterationSummary] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            'status': self.status,
+            'iterations': self.iterations,
+            'config': self.config,
+            'token_usage': self.token_usage,
+            'history': [iteration.to_dict() for iteration in self.history],
+        }
+    
+    def save(self, path: str):
+        with open(path, 'w') as f:
+            json.dump(self.to_dict(), f, indent=4)
     
     @staticmethod
-    def save_results(results: List['AgentResult']):
+    def save_results(results: List['AgentResult'], path: str):
         
         data = []
         for result in results:
-            data.append({
-                'sample': result.sample,
-                'status': result.status,
-                'iterations': result.iterations,
-                'config': result.config,
-                'token_usage': result.token_usage,
-                'history': [iteration.to_dict() for iteration in result.history],
-            })
+            data.append(result.to_dict())
 
         summary = {
             'total_samples': len(results),
             'successful': sum(1 for r in results if r.status == 'success'),
+            'max_iterations': sum(1 for r in results if r.status == 'max_iterations'),
             'failed': sum(1 for r in results if r.status == 'failure'),
             'results': data,
         }
 
-        with open(f'{settings.runtime.EXPERIMENT_DIR}/summary.json', 'w') as f:
+        with open(path, 'w') as f:
             json.dump(summary, f, indent=4)

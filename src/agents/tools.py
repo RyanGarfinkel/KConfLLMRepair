@@ -1,58 +1,51 @@
 from langchain_core.tools import StructuredTool
-from src.config import settings
 from src.kernel import KConfig
 from src.models import Sample
-from src.tools import qemu
 from src.core import Kernel
-from src.utils import log
 import shutil
 import os
 import re
 
 class Tools:
 
-    __BASE_CONFIG = KConfig(settings.runtime.BASE_CONFIG)
-
     def __init__(self, sample: Sample):
 
-        self.output_dir = f'{settings.runtime.EXPERIMENT_DIR}/sample_{sample.id}'
-        self.kernel = Kernel(sample.end_commit)
-
-        if not os.path.exists(f'{settings.runtime.SAMPLE_DIR}/sample_{sample.id}'):
-            raise Exception(f'Sample directory {self.output_dir} does not exist. Cannot initialize Tools for sample {sample.id}.')
+        self.output_dir = sample.output
+        self.kernel = Kernel(sample.kernel_src)
         
-        os.makedirs(self.output_dir, exist_ok=True)
-        shutil.copytree(sample.dir, f'{self.output_dir}/try_0', dirs_exist_ok=True)
+        if not os.path.exists(f'{self.output_dir}/attempt_0'):
+            raise Exception(f'Output directory {self.output_dir}/attempt_0 does not exist. Please run the initial attempt first.')
 
         self.tools_used = []
         self.succeeded = False
         self.attempt = 1
+        self.base_config = KConfig(f'{self.output_dir}/attempt_0/base.config')
 
     @property
     def patch_file(self) -> str:
-        return f'{self.output_dir}/try_0/changes.patch'
+        return f'{self.output_dir}/attempt_0/changes.patch'
 
     @property
     def config(self) -> str:
-        return f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.config'
+        return f'{self.output_dir}/attempt_{self.attempt - 1}/modified.config'
 
     @property
     def latest_log(self) -> str:
 
         # QEMU log
-        qemu_log = f'{self.output_dir}/try_{self.attempt - 1}/qemu.log'
+        qemu_log = f'{self.output_dir}/attempt_{self.attempt - 1}/qemu.log'
         if os.path.exists(qemu_log):
             with open(qemu_log, 'r') as f:
                 return ' '.join(self.__truncate(f.readlines()))
         
         # Build log
-        build_log = f'{self.output_dir}/try_{self.attempt - 1}/build.log'
+        build_log = f'{self.output_dir}/attempt_{self.attempt - 1}/build.log'
         if os.path.exists(build_log):
             with open(build_log, 'r') as f:
                 return ' '.join(self.__truncate(f.readlines()))
             
         # KLocalizer log
-        klocalizer_log = f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.log'
+        klocalizer_log = f'{self.output_dir}/attempt_{self.attempt - 1}/klocalizer.log'
         if os.path.exists(klocalizer_log):
             with open(klocalizer_log, 'r') as f:
                 return ' '.join(self.__truncate(f.readlines()))
@@ -99,7 +92,7 @@ class Tools:
             list[str]: A list of lines from the KLocalizer log file that match the regex pattern.
         """
 
-        klocalizer_log = f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.log'
+        klocalizer_log = f'{self.output_dir}/attempt_{self.attempt - 1}/klocalizer.log'
 
         if not os.path.exists(klocalizer_log):
             return ['Error. There was no KLocalizer log for the latest try.']
@@ -132,7 +125,7 @@ class Tools:
             list[str]: A list of lines from the build log file that match the regex pattern.
         """
 
-        build_log = f'{self.output_dir}/try_{self.attempt - 1}/build.log'
+        build_log = f'{self.output_dir}/attempt_{self.attempt - 1}/build.log'
 
         if not os.path.exists(build_log):
             return ['Error. There was no build log for the latest try.']
@@ -165,7 +158,7 @@ class Tools:
             list[str]: A list of lines from the QEMU boot log file that match the regex pattern.
         """
 
-        qemu_log = f'{self.output_dir}/try_{self.attempt - 1}/qemu.log'
+        qemu_log = f'{self.output_dir}/attempt_{self.attempt - 1}/qemu.log'
 
         if not os.path.exists(qemu_log):
             return ['Error. There was no QEMU boot log for the latest try.']
@@ -200,7 +193,7 @@ class Tools:
 
         values = []
         for option in options:
-            value = Tools.__BASE_CONFIG.options.get(option, None)
+            value = self.base_config.options.get(option, None)
             if value is not None:
                 values.append(f'{option}={value}')
             else:
@@ -224,7 +217,7 @@ class Tools:
             list[str]: A list of values of the options searched for that were found in the KLocalizer config file.
         """
 
-        klocalizer_config = f'{self.output_dir}/try_{self.attempt - 1}/klocalizer.config'
+        klocalizer_config = f'{self.output_dir}/attempt_{self.attempt - 1}/modified.config'
 
         if not os.path.exists(klocalizer_config):
             return ['Error. There was no KLocalizer config file for the latest try.']
@@ -262,7 +255,7 @@ class Tools:
         if self.succeeded:
             return ['The agent has already succeeded. No further changes are needed.']
 
-        try_dir = f'{self.output_dir}/try_{self.attempt}'
+        try_dir = f'{self.output_dir}/attempt_{self.attempt}'
         os.makedirs(try_dir, exist_ok=True)
 
         shutil.copy(self.patch_file, f'{try_dir}/changes.patch')
@@ -279,7 +272,7 @@ class Tools:
         if not self.kernel.run_klocalizer(try_dir, define, undefine):
             return [f'Error. KLocalizer failed to run. Check the log for details.', self.__tail(f"{try_dir}/klocalizer.log")]
 
-        if not self.kernel.build(f'{try_dir}/klocalizer.config', f'{try_dir}/build.log'):
+        if not self.kernel.build(f'{try_dir}/modified.config', f'{try_dir}/build.log'):
             return [f'Error. Kernel build failed. Check the log for details.', self.__tail(f"{try_dir}/build.log")]
         
         if not self.kernel.boot(f'{try_dir}/qemu.log'):

@@ -8,18 +8,22 @@ import os
 
 class Kernel:
 
-    def __init__(self, commit: str):
+    def __init__(self, kernel_src: str):
 
-        self.repo = KernelRepo(commit)
+        self.kernel_src = kernel_src
+        self.repo = KernelRepo(kernel_src)
 
     @staticmethod
     def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
 
         return KernelRepo.get_sample_ends(n, start_commit)
 
+    def get_kernel_version(self) -> str:
+        return self.repo.get_kernel_version()
+    
     def create_patch(self, output_dir: str) -> tuple[bool, str | None]:
         
-        log.info(f'Creating patch for kernel {self.repo.commit}...')
+        log.info(f'Creating patch for kernel...')
 
         success, start_commit = self.repo.make_patch(output_dir)
 
@@ -33,7 +37,7 @@ class Kernel:
     
     def load_config(self, config: str) -> bool:
 
-        log.info(f'Loading configuration for kernel {self.repo.commit}...')
+        log.info(f'Loading configuration for kernel...')
 
         if not os.path.exists(config):
             log.error(f'Configuration file {config} does not exist.')
@@ -45,17 +49,18 @@ class Kernel:
 
     def run_klocalizer(self, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
 
-        if not self.load_config(settings.runtime.BASE_CONFIG):
+        if not os.path.exists(f'{self.repo.path}/.config'):
+            log.error('No .config file found in kernel source. Please load a configuration before running KLocalizer.')
             return False
 
-        log.info(f'Running KLocalizer for kernel {self.repo.commit}...')
+        log.info('Running KLocalizer for kernel...')
         
         if klocalizer.run(self.repo, sample_dir, define, undefine):
-            log.success(f'KLocalizer completed successfully.')
-            shutil.copy(f'{self.repo.path}/.config', f'{sample_dir}/klocalizer.config')
+            log.success('KLocalizer completed successfully.')
+            shutil.copy(f'{self.repo.path}/.config', f'{sample_dir}/modified.config')
             return True
         
-        log.error(f'KLocalizer failed.')
+        log.error('KLocalizer failed.')
 
         return False
 
@@ -63,7 +68,7 @@ class Kernel:
 
         self.load_config(config)
 
-        log.info(f'Building kernel {self.repo.commit}...')
+        log.info('Building kernel...')
 
         built_successfully = builder.build(self.repo, log_file)
 
@@ -76,7 +81,7 @@ class Kernel:
 
     def boot(self, log_file: str) -> bool:
 
-        log.info(f'Running QEMU test on kernel {self.repo.commit}...')
+        log.info('Running QEMU test on kernel...')
 
         boot_success = qemu.test(self, log_file)
 
@@ -89,7 +94,4 @@ class Kernel:
     
     def cleanup(self):
         
-        self.repo.cleanup()
-
-        if os.path.exists(self.repo.path):
-            shutil.rmtree(self.repo.path)
+        KernelRepo.cleanup(self.kernel_src)

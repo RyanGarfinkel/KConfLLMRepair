@@ -6,7 +6,6 @@ import click
 
 def repair_samples(n: int, model_override: str | None = None):
 
-
     agent = Agent(model_override)
     samples = Sample.get_samples(n)
 
