@@ -1,24 +1,36 @@
-from src.models import AgentResult
-from src.core.agent import Agent
+from src.kernel import KernelRepo
 from src.models import Sample
 from src.utils import log
+import subprocess
 import click
 
 def repair_samples(n: int, model_override: str | None = None):
 
-    agent = Agent(model_override)
     samples = Sample.get_samples(n)
-
-    results = []
 
     for i, sample in enumerate(samples):
 
         log.info(f'Repairing sample {i + 1}...')
 
-        result = agent.repair(sample)
-        
-        results.append(result)
-        AgentResult.save_results(results)
+        kernel_src = KernelRepo.create_worktree(sample.commit)
+        base = sample.base
+        modified = sample.modified
+        patch = sample.patch
+
+        cmd = [
+            'python3', '-m', 'src.scripts.repair',
+            '--base', base,
+            '--modified', modified,
+            '--patch', patch,
+            '--kernel-src', kernel_src,
+            '--output', sample.output,
+        ]
+
+        if model_override:
+            cmd.extend(['--model-override', model_override])
+
+        subprocess.run(cmd, check=True)
+    
 
 @click.command()
 @click.option('--n', default=10, help='Number of samples to repair.')

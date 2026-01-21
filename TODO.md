@@ -3,16 +3,18 @@ Core:
 - [x] Make sh script to run klocalizer
 - [x] Make sh script to run QEMU
 - [x] Move signal code from src/scripts/sample.py to KernelRepo class
-- [ ] Review ccache to speed up kernel builds
+- [x] Review ccache to speed up kernel builds
 - [x] Configure JOBS property in settings
-- [ ] Setup multithreading, taking into consideration memory available (worktree crash)
+- [x] Setup multithreading, taking into consideration memory available (worktree crash)
 - [x] Add max threads option for multithreading
 - [ ] Pipe logs to file for multithreading with more than 1 thread
 - [x] Config refactoring to use nested options
 
 Sample Generation:
-- [ ] Move base config to sample directory
-- [ ] Generate the base config from syz-kconf tool
+- [x] Move base config to sample directory
+- [x] Generate the base config from syz-kconf tool
+- [ ] Incorporate dispatcher into repair_samples.py. Pipe terminal output to log file.
+- [ ] Make sampling end date a parameter.
 
 LLM:
 - [ ] Make runner file with options: n, model-override, max-iterations
@@ -23,3 +25,5 @@ LLM:
 - [x] Update readme with llm how to use information
 - [ ] Delete agent_response.json extra output (previously used for testing)
 - [ ] Record token usage
+- [ ] Move final config to agent-repair-attempts directory.
+- [ ] Create summary.json to summarize all attempts.

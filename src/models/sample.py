@@ -11,6 +11,44 @@ class Sample:
     patch: str
     kernel_src: str
     output: str
+    commit: str | None
+
+    @staticmethod
+    def get_samples(n: int) -> list['Sample']:
+        
+        with open(f'{settings.runtime.SAMPLE_DIR}/info.json') as f:
+            data = json.load(f)
+
+        samples = []
+        for i, sample_data in enumerate(data['samples']):
+
+            if i >= n:
+                break
+
+            if not sample_data['isBaseBootable']:
+                continue
+
+            dir = sample_data['dir']
+
+            base = f'{dir}/base.config'
+            modified = f'{dir}/modified.config'
+            patch = f'{dir}/changes.patch'
+            kernel_src = ''
+            output = dir
+            commit = sample_data['end_commit']
+
+            sample = Sample(
+                base=base,
+                modified=modified,
+                patch=patch,
+                kernel_src=kernel_src,
+                output=output,
+                commit=commit
+            )
+
+            samples.append(sample)
+        
+        return samples
 
 @dataclass
 class SampleRaw:
@@ -26,7 +64,7 @@ class SampleRaw:
         return {
             'end_commit': self.end_commit,
             'start_commit': self.start_commit,
-            'commit_date': self.commit_date,
+            'end_commit_date': self.commit_date,
             'commit_window': self.commit_window,
             'dir': self.dir,
             'isBaseBootable': self.isBaseBootable,

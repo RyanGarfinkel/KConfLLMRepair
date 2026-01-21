@@ -15,17 +15,23 @@ Please the follow the [.env.template](.env.template) to setup you `.env` file
 
 ### How to Run
 
+The repair script attempts to repair only one configuration at a time. See the [experiment section](#running-the-experiment) to repair more than one configuration at once. Additional options can be passed in to control the model used during the repair, amount of iterations, number of parallel jobs when building the kernel, and where to direct the output. See the table below. See the [output format](#output-format) for more information.
+
+```bash
+python3 -m src.scripts.repair --base base.config --modified modified.config --patch changes.patch --kernel-src $KERNEL_SRC
+```
+
 ### Repair Options
-| Option             | Required? | Example                         | Description                                                                                                                  |
-|--------------------|-----------|---------------------------------|------------------------------------------------------------------------------------------------------------------------------|
-| `--base`           | - [x]     | `--base base.config`            | Path to original configuration.                                                                                              |
-| `--modified`       | - [x]     | `--modified modified.config`    | Path to modified configuration.                                                                                              |
-| `--patch`          | - [x]     | `--patch changes.patch`         | Path to file/patch klocalizer should target.                                                                                 |
-| `--output`         | - [ ]     | `--output workspace/sample_0`   | Path where agent-repair directory will be created. By default, this is the current working directory.                        |
-| `--kernel-src`     | - [ ]     | `--kernel-src $KERNEL_WORKTREE` | Path to kernel source. By default, this looks for $KERNEL_SRC environment variable.                                          |
-| `--model`          | - [ ]     | `--model gpt-4o-mini`           | Sets which model the agent should use. If empty, gemini-3-pro-preview or                                                     |
-| `--max-iterations` | - [ ]     | `--max-iterations 10`           | Sets the maximum amount of tries the agent has to apply and test changes to the configuration. By default, this is set to 5. |
-| `--jobs`           | - [ ]     | `--jobs 8`                      | Sets the number of jobs to run when building the kernel image. By default, this is set to 8.                                 |
+| Option             | Required?          | Example                         | Description                                                                                                                  |
+|--------------------|--------------------|---------------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `--base`           | :white_check_mark: | `--base base.config`            | Path to original configuration.                                                                                              |
+| `--modified`       | :white_check_mark: | `--modified modified.config`    | Path to modified configuration.                                                                                              |
+| `--patch`          | :white_check_mark: | `--patch changes.patch`         | Path to file/patch klocalizer should target.                                                                                 |
+| `--output`         | :x:                | `--output workspace/sample_0`   | Path where agent-repair directory will be created. By default, this is the current working directory.                        |
+| `--kernel-src`     | :x:                | `--kernel-src $KERNEL_WORKTREE` | Path to kernel source. By default, this looks for $KERNEL_SRC environment variable.                                          |
+| `--model`          | :x:                | `--model gpt-4o-mini`           | Sets which model the agent should use. If empty, gemini-3-pro-preview or                                                     |
+| `--max-iterations` | :x:                | `--max-iterations 10`           | Sets the maximum amount of tries the agent has to apply and test changes to the configuration. By default, this is set to 5. |
+| `--jobs`           | :x:                | `--jobs 8`                      | Sets the number of jobs to run when building the kernel image. By default, this is set to 8.                                 |
 
 ### Tools
 | Tool                  | Args                                   | Description                                               |
@@ -41,7 +47,7 @@ Please the follow the [.env.template](.env.template) to setup you `.env` file
 ### Output Format
 The `boot-agent` directory will be created in the output directory sepecified in the command (or the current working directory). The repaired configuration will be saved in `.config`. Information about the tools used and iteration summaries will be stored in `summary.json`.
 ```
-boot-agent/
+agent-repair-attempts/
 ├── attempt_0/
 ├── attempt_#/
 │   ├── build.log
@@ -49,8 +55,25 @@ boot-agent/
 │   ├── changes.patch.kloc_targets
 │   ├── klocalizer.log
 │   ├── modified.config
+│   ├── info.json
 ├── .config
 ├── summary.json
 ```
 
-## Generating Samples
+## Running the Experiment
+
+See my [Google Drive folder](https://drive.google.com/drive/u/1/folders/1jIB91vHjTCAGMrzhVpkVojy9UwUpXVOz) to see past samples and agent repairs.
+
+### Generating Samples
+
+The `generate_samples.py` script uses syzkaller's syz-kconf tool to generate the base configuration. Patches are randomly selected from all of the linux-next's commits from the latest commit to commits as early as `01/01/2020`.
+
+Optional Parameters;
+- `--n` Number of samples to generate. Default is 10.
+- `--commit-window` Number of commits to include in each patch. Default is 250.
+- `--max-threads` Max number of samples that can be generated at once. Default is 1.
+- `--jobs` Number of jobs when building each sample. Default is 8.
+
+### Repair All
+
+

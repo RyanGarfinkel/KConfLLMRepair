@@ -13,7 +13,7 @@ def select_commits(repo: Repo, n: int) -> tuple[int, int, list[tuple[str, str]]]
 
     log.info(f'Performing systematic random sampling of {n} commits from the repository...')
 
-    all_commits = repo.git.rev_list('HEAD', '--since=2020-01-01').splitlines()
+    all_commits = repo.git.rev_list('HEAD', '--since=2020-01-01', '--no-merges').splitlines()
     total_commits = len(all_commits) - settings.runtime.COMMIT_WINDOW
     k = total_commits // n
 
@@ -33,6 +33,7 @@ def select_commits(repo: Repo, n: int) -> tuple[int, int, list[tuple[str, str]]]
     sampling_params = {
         'start': start,
         'k': k,
+        'n': n,
         'total_commits': len(all_commits),
         'latest_commit': repo.commit(all_commits[0]).authored_datetime.isoformat(),
         'earliest_commit': repo.commit(all_commits[-1]).authored_datetime.isoformat(),

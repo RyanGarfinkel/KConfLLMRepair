@@ -21,11 +21,11 @@ class Kernel:
     def get_kernel_version(self) -> str:
         return self.repo.get_kernel_version()
     
-    def create_patch(self, output_dir: str) -> tuple[bool, str | None]:
+    def create_patch(self, output_dir: str, start_commit: str | None = None) -> tuple[bool, str | None]:
         
         log.info(f'Creating patch for kernel...')
 
-        success, start_commit = self.repo.make_patch(output_dir)
+        success, start_commit = self.repo.make_patch(output_dir, start_commit)
 
         if not success:
             log.error('Failed to create patch for kernel.')

@@ -11,7 +11,7 @@ def handler():
 
     global active_kernels
     
-    for path in active_kernels.keys():
+    for path in list(active_kernels.keys()):
         KernelRepo.cleanup(path)
 
 atexit.register(handler)
@@ -45,19 +45,22 @@ class KernelRepo:
 
         return f'{version}.{patchlevel}.{sublevel}{extraversion}'
 
-    def make_patch(self, output_dir: str) -> tuple[bool, str | None]:
+    def make_patch(self, output_dir: str, start_commit: str | None = None) -> tuple[bool, str | None]:
 
         end = self.repo.head.commit
 
-        commits = list(self.repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW))
+        if start_commit:
+            start = self.repo.commit(start_commit)
+        else:
+            commits = list(self.repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW))
 
-        if not commits:
-            log.info(f'No commits found for commit {self.commit}. Cannot create patch.')
-            return False, None
+            if not commits:
+                log.info(f'No commits found for commit {self.commit}. Cannot create patch.')
+                return False, None
 
-        start = commits[-1]
+            start = commits[-1]
 
-        patch = self.repo.git.diff(f'{start.hexsha}..{end.hexsha}')
+        patch = self.repo.git.log('-p', '--no-merges', f'{start.hexsha}..{end.hexsha}')
         patch_file = f'{output_dir}/changes.patch'
 
         if not patch:
@@ -83,7 +86,7 @@ class KernelRepo:
 
         for _ in range(n - 1):
 
-            start = list(repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW))[-1]
+            start = list(repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW, no_merges=True))[-1]
             start = start.parents[0]
 
             commits.append(start.hexsha)
@@ -115,21 +118,32 @@ class KernelRepo:
             log.info('Cannot clean up the main kernel source directory. Skipping cleanup.')
             return
         
+        log.info('Cleaning up worktree.')
+        
         try:
-            log.info('Cleaning up worktree.')
 
             KernelRepo.__main_repo.git.worktree('remove', '-f', path)
-            if path in active_kernels:
-                del active_kernels[path]
-        except Exception as e:
-            log.error(f'Error cleaning up worktree: {e}')
-        finally:
+            log.success('Worktree removed from git tracking.')
 
-            if not os.path.exists(path):
-                return
+        except Exception as e:
+
+            log.error(f'git worktree remove failed: {e}')
+
+            if os.path.exists(path):
+                try:
+                    log.info('Removing worktree directory manually.')
+                    shutil.rmtree(path)
+                    log.success('Worktree directory removed.')
+                except Exception as rm_err:
+                    log.error(f'Error removing worktree directory: {rm_err}')
+            
             try:
-                log.info('Removing worktree directory.')
-                shutil.rmtree(path)
-                log.success('Worktree directory removed successfully.')
-            except Exception as e:
-                log.error(f'Error removing worktree directory: {e}')
+
+                KernelRepo.__main_repo.git.worktree('prune')
+                log.info('Pruned stale worktree references.')
+                
+            except Exception as prune_err:
+                log.error(f'git worktree prune failed: {prune_err}')
+        
+        if path in active_kernels:
+            del active_kernels[path]

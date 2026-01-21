@@ -75,7 +75,7 @@ def main(base: str, modified: str, patch: str, output: str | None, kernel_src: s
         raise ValueError(f'Patch file {patch} does not exist.')
 
     if output is None:
-        output = os.getcwd() + '/agent-repair'
+        output = os.getcwd() + '/agent-repair-attempts'
     
     if kernel_src is None:
         kernel_src = settings.kernel.KERNEL_SRC
@@ -91,11 +91,12 @@ def main(base: str, modified: str, patch: str, output: str | None, kernel_src: s
     os.makedirs(output, exist_ok=True)
     
     sample = Sample(
-        base=base,
-        modified=modified,
-        patch=patch,
-        kernel_src=kernel_src,
-        output=output
+        base=os.path.abspath(base),
+        modified=os.path.abspath(modified),
+        patch=os.path.abspath(patch),
+        kernel_src=os.path.abspath(kernel_src),
+        output=os.path.abspath(output) + '/agent-repair-attempts',
+        commit=None
     )
 
     repair(sample, model)
