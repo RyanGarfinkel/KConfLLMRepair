@@ -5,6 +5,7 @@ from singleton_decorator import singleton
 from langchain_openai import ChatOpenAI
 from src.config import settings
 from src.utils import log
+import shutil
 
 @singleton
 class Agent:
@@ -54,14 +55,16 @@ class Agent:
                 break
 
             iter_summary.tools_used = tools.tools_used
-            tools.tools_used = []
 
             context.history.append(iter_summary)
+
+        config = f'{sample.output}/.config'
+        shutil.copyfile(f'{sample.output}/attempt_{settings.agent.MAX_ITERATIONS}/modified.config', config)
 
         return AgentResult(
             iterations=len(context.history),
             history=context.history,
-            config=tools.config,
+            config=config,
             token_usage=sum(iter_summary.token_usage for iter_summary in context.history),
             status='success' if tools.succeeded else 'max_iterations' if len(context.history) == settings.agent.MAX_ITERATIONS else 'failure'
         )

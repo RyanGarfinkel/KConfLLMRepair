@@ -1,6 +1,6 @@
-from src.models import Sample, AgentResult
 from src.core import Agent, Kernel
 from src.config import settings
+from src.models import Sample
 from src.utils import log
 import shutil
 import click

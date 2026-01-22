@@ -4,7 +4,7 @@ from src.utils import log
 import subprocess
 import click
 
-def repair_samples(n: int, model_override: str | None = None):
+def repair_samples(n: int, model_override: str | None = None, max_iterations: int = 5):
 
     samples = Sample.get_samples(n)
 
@@ -24,6 +24,7 @@ def repair_samples(n: int, model_override: str | None = None):
             '--patch', patch,
             '--kernel-src', kernel_src,
             '--output', sample.output,
+            '--max-iterations', str(max_iterations),
         ]
 
         if model_override:
@@ -35,7 +36,8 @@ def repair_samples(n: int, model_override: str | None = None):
 @click.command()
 @click.option('--n', default=10, help='Number of samples to repair.')
 @click.option('--model-override', default=None, help='Override the default LLM model to use for repair.')
-def main(n: int, model_override: str | None = None):
+@click.option('--max-iterations', default=5, type=int, help='Override the maximum number of iterations for the agent.')
+def main(n: int, model_override: str | None = None, max_iterations: int = 5):
 
     log.info(f'Starting repair process for {n} samples...')
 
@@ -44,7 +46,7 @@ def main(n: int, model_override: str | None = None):
     else:
         log.info('Using default model based on available API keys.')
 
-    repair_samples(n, model_override)
+    repair_samples(n, model_override, max_iterations)
 
     log.info('Repair process completed.')
 

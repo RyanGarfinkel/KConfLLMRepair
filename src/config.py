@@ -41,6 +41,8 @@ class AgentSettings(BaseModel):
     GOOGLE_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
     MAX_ITERATIONS: int = 5
+    PROVIDER: str = 'openai'
+    MAX_MATCHES: int = 5
 
     @model_validator(mode='after')
     def verify_api_key(self):

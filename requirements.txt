@@ -10,4 +10,5 @@ langchain-community
 singleton-decorator
 pandas
 langchain-openai
+faiss-cpu
 tqdm
