@@ -4,7 +4,7 @@ from src.utils import log
 import subprocess
 import click
 
-def repair_samples(n: int, model_override: str | None = None, max_iterations: int = 5):
+def repair_samples(n: int, model: str | None = None, max_iterations: int = 5, jobs: int | None = None):
 
     samples = Sample.get_samples(n)
 
@@ -27,26 +27,30 @@ def repair_samples(n: int, model_override: str | None = None, max_iterations: in
             '--max-iterations', str(max_iterations),
         ]
 
-        if model_override:
-            cmd.extend(['--model-override', model_override])
+        if model:
+            cmd.extend(['--model', model])
+
+        if jobs:
+            cmd.extend(['--jobs', str(jobs)])
 
         subprocess.run(cmd, check=True)
     
 
 @click.command()
 @click.option('--n', default=10, help='Number of samples to repair.')
-@click.option('--model-override', default=None, help='Override the default LLM model to use for repair.')
+@click.option('--model', default=None, help='Override the default LLM model to use for repair.')
 @click.option('--max-iterations', default=5, type=int, help='Override the maximum number of iterations for the agent.')
-def main(n: int, model_override: str | None = None, max_iterations: int = 5):
+@click.option('--jobs', default=None, type=int, help='Number of jobs to run when building the kernel, otherwise set to 8.')
+def main(n: int, model: str | None = None, max_iterations: int = 5, jobs: int | None = None):
 
     log.info(f'Starting repair process for {n} samples...')
 
-    if model_override:
-        log.info(f'Using model override: {model_override}')
+    if model:
+        log.info(f'Using model override: {model}')
     else:
         log.info('Using default model based on available API keys.')
 
-    repair_samples(n, model_override, max_iterations)
+    repair_samples(n, model, max_iterations, jobs)
 
     log.info('Repair process completed.')
 

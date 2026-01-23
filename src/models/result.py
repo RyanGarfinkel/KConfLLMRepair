@@ -7,6 +7,9 @@ import json
 @dataclass
 class AgentResult:
 
+    provider: str
+    model: str
+    
     status: Literal['success', 'failure', 'max_iterations']
     iterations: int
 

@@ -6,6 +6,34 @@ import shutil
 import click
 import os
 
+def update_provider(model: str | None):
+
+        if model is None:
+            model = 'gpt-5.2' if settings.agent.OPENAI_API_KEY else 'gemini-2.5-flash' if settings.agent.GOOGLE_API_KEY else None
+
+        if model is None:
+            raise ValueError('Must have at least one valid API key to initialize LLM.')
+        
+        if model.startswith('gpt'):
+
+            if not settings.agent.OPENAI_API_KEY:
+                raise ValueError('OPENAI_API_KEY is not set but model override specifies an OpenAI model.')
+            
+            settings.agent.PROVIDER = 'openai'
+            settings.agent.MODEL = model
+        elif model.startswith('gemini'):
+            
+            if not settings.agent.GOOGLE_API_KEY:
+                raise ValueError('GOOGLE_API_KEY is not set but model override specifies a Google model.')
+            
+            settings.agent.PROVIDER = 'google'
+            settings.agent.MODEL = model
+        else:
+            raise ValueError(f'Unknown model: {model}')
+
+        log.info(f'Agent provider set to {settings.agent.PROVIDER}.')
+        log.info(f'Agent model set to {settings.agent.MODEL}.')
+
 def initial_attempt(sample: Sample) -> bool:
 
     log.info('Verifying modified configuration does not boot...')
@@ -42,7 +70,8 @@ def repair(sample: Sample, model: str | None):
 
     log.info('Creating agent for repair process...')
     
-    agent = Agent(model)
+    update_provider(model)
+    agent = Agent()
 
     log.success('Agent created successfully.')
     log.info('Starting repair process...')

@@ -42,6 +42,7 @@ class AgentSettings(BaseModel):
     OPENAI_API_KEY: str | None = None
     MAX_ITERATIONS: int = 5
     PROVIDER: str = 'openai'
+    MODEL: str = 'gpt-5.2'
     MAX_MATCHES: int = 5
 
     @model_validator(mode='after')

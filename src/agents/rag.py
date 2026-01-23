@@ -97,7 +97,8 @@ class RAG:
         self.__load_vector_store()
 
         self.queries = []
-    
+        self.type = type
+        
     def __get_embedding_model(self):
 
         if settings.agent.PROVIDER == 'google':
@@ -107,7 +108,7 @@ class RAG:
         
     def __load_vector_store(self):
 
-        if not os.path.exists(self.path):
+        if self.path is None or not os.path.exists(self.path):
             self.vector_store = None
             return
         
@@ -130,18 +131,29 @@ class RAG:
         self.__load_vector_store()
     
     def search(self, query: str) -> str:
-
-        self.queries.append({
+        
+        if not self.vector_store:
+            print(f'No vector store available for type {self.type}.')
+            self.queries.append({
+                'file': self.type,
                 'query': query,
                 'results': 'No data available. File not found.',
             })
-        
-        if not self.vector_store:
             return 'No data available. File not found.'
+        
+        print(f'Vector store found for type {self.type}, performing similarity search...')
         
         results = self.vector_store.similarity_search(query, k=settings.agent.MAX_MATCHES)
 
-        self.queries[-1]['results'] = [doc.page_content for doc in results]
+        self.queries.append({
+                'type': self.type,
+                'file': self.path,
+                'query': query,
+                'results': [doc.page_content for doc in results],
+            })
+        
+        print('results')
+        print(self.queries[-1]['results'])
 
         return '\n'.join(self.queries[-1]['results'])
     

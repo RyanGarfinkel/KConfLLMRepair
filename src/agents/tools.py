@@ -135,6 +135,7 @@ class Tools:
         """
         Applies the changes to the kernel configuration using klocalizer and tests the resulting kernel in QEMU.
         The boot log, delta from baseline, and new configuration will be updated after this tool runs.
+        ONLY use after gathering sufficient information from the other tools. This tool is expensive and time consuming.
 
         Args:
             define list[str]: List of configuration options that the klocalizer tool keeps enabled.
@@ -153,7 +154,6 @@ class Tools:
 
         os.makedirs(attempt_dir, exist_ok=True)
         shutil.copyfile(f'{self.sample.output}/attempt_{self.attempt - 1}/changes.patch', f'{attempt_dir}/changes.patch')
-        self.attempt += 1
 
         self.used.append({
             'tool': 'apply_and_test',
@@ -165,21 +165,27 @@ class Tools:
             'boot_succeeded': False,
         })
 
-        self.build_log.reload(f'{attempt_dir}/build.log')
-        self.qemu_log.reload(f'{attempt_dir}/qemu.log')
+        self.build_log.reload(None)
+        self.qemu_log.reload(None)
+        self.attempt += 1
 
         self.kernel.load_config(self.base_config.path)
         if not self.kernel.run_klocalizer(attempt_dir, define, undefine):
             return ['KLocalizer failed to apply the configuration changes.']
         
         self.used[-1]['klocalizer_succeeded'] = True
+
         
-        if not self.kernel.build(f'{attempt_dir}/modified.config', f'{attempt_dir}/build.log'):
+        kernel_built = self.kernel.build(f'{attempt_dir}/modified.config', f'{attempt_dir}/build.log')
+        self.build_log.reload(f'{attempt_dir}/build.log')
+        if not kernel_built:
             return ['Kernel build failed after applying configuration changes. Check build log for details.']
 
         self.used[-1]['build_succeeded'] = True
 
-        if not self.kernel.boot(f'{attempt_dir}/qemu.log'):
+        qemu_succeeded = self.kernel.boot(f'{attempt_dir}/qemu.log')
+        self.qemu_log.reload(f'{attempt_dir}/qemu.log')
+        if not qemu_succeeded:
             return ['Kernel failed to boot in QEMU after applying configuration changes. Check QEMU log for details.']
 
         self.used[-1]['boot_succeeded'] = True

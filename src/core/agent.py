@@ -10,30 +10,18 @@ import shutil
 @singleton
 class Agent:
 
-    def __init__(self, model_override: str | None):
+    def __init__(self):
 
-        self.llm = self.__get_llm(model_override)
+        self.llm = self.__get_llm(settings.agent.MODEL)
 
-    def __get_llm(self, override: str | None = None):
+    def __get_llm(self, model: str):
 
-        if override:
-            return self.__init_model(override)
-
-        if settings.agent.OPENAI_API_KEY:
-            return self.__init_model('gpt-4o-mini')
-        elif settings.agent.GOOGLE_API_KEY:
-            return self.__init_model('gemini-2.5-flash')
+        if model.startswith('gpt'):
+            return ChatOpenAI(model=model, api_key=settings.agent.OPENAI_API_KEY)
+        elif model.startswith('gemini'):
+            return ChatGoogleGenerativeAI(model=model, api_key=settings.agent.GOOGLE_API_KEY)
         else:
-            raise ValueError('Must have at least one valid API key to initialize LLM.')
-  
-    def __init_model(self, provider: str):
-
-        if provider.startswith('gpt'):
-            return ChatOpenAI(model=provider, api_key=settings.agent.OPENAI_API_KEY)
-        elif provider.startswith('gemini'):
-            return ChatGoogleGenerativeAI(model=provider, api_key=settings.agent.GOOGLE_API_KEY)
-        else:
-            raise ValueError(f'Unknown provider: {provider} or missing API key.')
+            raise ValueError(f'Unknown provider for model: {model}')
 
     def repair(self, sample: Sample) -> AgentResult:
 
@@ -42,6 +30,9 @@ class Agent:
         executor = Executor(self.llm, tools.get_tools())
 
         for i in range(settings.agent.MAX_ITERATIONS):
+
+            if tools.succeeded:
+                break
 
             log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS}...')
 
@@ -59,9 +50,11 @@ class Agent:
             context.history.append(iter_summary)
 
         config = f'{sample.output}/.config'
-        shutil.copyfile(f'{sample.output}/attempt_{settings.agent.MAX_ITERATIONS}/modified.config', config)
+        shutil.copyfile(f'{sample.output}/attempt_{len(context.history)}/modified.config', config)
 
         return AgentResult(
+            provider=settings.agent.PROVIDER,
+            model=settings.agent.MODEL,
             iterations=len(context.history),
             history=context.history,
             config=config,

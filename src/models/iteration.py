@@ -26,6 +26,10 @@ class ExecutorSummary(BaseModel):
         description='The observations made during this iteration.'
     )
 
-    suggestions: str = Field(
-        description='The suggestions for the next steps to take in the repair process.'
+    actions: str = Field(
+        description='The actions taken during this iteration.'
+    )
+
+    next_steps: str = Field(
+        description='The next steps to be taken in the repair process during the next iteration and why.'
     )

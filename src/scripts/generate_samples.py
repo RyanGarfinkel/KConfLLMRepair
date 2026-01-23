@@ -9,11 +9,11 @@ from git import Repo
 import click
 import os
 
-def select_commits(repo: Repo, n: int) -> tuple[int, int, list[tuple[str, str]]]:
+def select_commits(repo: Repo, n: int, since: str) -> tuple[int, int, list[tuple[str, str]]]:
 
     log.info(f'Performing systematic random sampling of {n} commits from the repository...')
 
-    all_commits = repo.git.rev_list('HEAD', '--since=2020-01-01', '--no-merges').splitlines()
+    all_commits = repo.git.rev_list('HEAD', f'--since={since}', '--no-merges').splitlines()
     total_commits = len(all_commits) - settings.runtime.COMMIT_WINDOW
     k = total_commits // n
 
@@ -84,10 +84,10 @@ def make_sample(sample: SampleRaw):
 
     kernel.cleanup()
 
-def make_samples(n: int):
+def make_samples(n: int, since: str):
 
     repo = Repo(settings.kernel.KERNEL_SRC)
-    sampling_params, commits = select_commits(repo, n)
+    sampling_params, commits = select_commits(repo, n, since)
 
     for i, sample in enumerate(commits):
         log.info(f'Generating sample {i + 1}/{n}...')
@@ -97,11 +97,13 @@ def make_samples(n: int):
 @click.command()
 @click.option('--n', default=10, help='Number of samples to generate.')
 @click.option('--commit-window', default=250, help='Number of commits to include in each patch.')
+@click.option('--since', default='2020-01-01', help='Only consider commits since this date (YYYY-MM-DD).')
 @click.option('--max-threads', default=1, help='Maximum number of threads to use for sample generation.')
 @click.option('--jobs', default=8, help='Number of parallel cores to use per sample generation.')
-def main(n: int, commit_window: int, max_threads: int, jobs: int):
+def main(n: int, commit_window: int, since: str, max_threads: int, jobs: int):
 
     log.info('Starting sample generation...')
+    log.info(f'Considering commits since {since}.')
     log.info(f'Using {max_threads} threads for sample generation.')
     log.info(f'Using {jobs} parallel cores per sample generation.')
 
@@ -109,7 +111,7 @@ def main(n: int, commit_window: int, max_threads: int, jobs: int):
     settings.runtime.MAX_THREADS = max_threads
     settings.runtime.JOBS = jobs
 
-    make_samples(n)
+    make_samples(n, since)
 
     log.info('Sample generation completed.')
 if __name__ == '__main__':

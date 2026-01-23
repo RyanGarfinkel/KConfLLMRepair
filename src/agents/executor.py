@@ -19,7 +19,7 @@ class Executor:
             if tool.name == 'apply_and_test':
                 middleware.append(ToolCallLimitMiddleware(tool_name=tool.name, thread_limit=1))
             else:
-                middleware.append(ToolCallLimitMiddleware(tool_name=tool.name, thread_limit=10))
+                middleware.append(ToolCallLimitMiddleware(tool_name=tool.name, thread_limit=24))
 
         self.agent = create_agent(
             llm,
@@ -35,13 +35,19 @@ class Executor:
             print('No structured response found in agent output.')
 
         tool_calls = []
+        token_usage = 0
         for message in response.get('messages', []):
-            if isinstance(message, AIMessage) and message.tool_calls:
-                tool_calls.extend(message.tool_calls)
+            if isinstance(message, AIMessage):
+
+                if message.tool_calls:
+                    tool_calls.extend(message.tool_calls)
+                
+                if message.usage_metadata:
+                    token_usage += message.usage_metadata.get('total_tokens', 0)
 
         return IterationSummary(
             executor_summary=executor_summary,
-            token_usage=0,
+            token_usage=token_usage,
             tools_used=tool_calls,
         )
 

@@ -9,15 +9,18 @@ Core:
 - [x] Add max threads option for multithreading
 - [ ] Pipe logs to file for multithreading with more than 1 thread
 - [x] Config refactoring to use nested options
+- [ ] KernelRepo -> Worktree.
+- [ ] Make src property in Kernel?
+- [ ] Make src.scripts -> src.cli
 
 Sample Generation:
 - [x] Move base config to sample directory
 - [x] Generate the base config from syz-kconf tool
 - [ ] Incorporate dispatcher into repair_samples.py. Pipe terminal output to log file.
-- [ ] Make sampling end date a parameter.
+- [x] Make sampling end date a parameter.
 
 LLM:
-- [ ] Make runner file with options: n, model-override, max-iterations
+- [x] Make runner file with options: n, model-override, max-iterations
 - [x] Direct result output to summary.csv and/or JSON
 - [ ] Create result extractor for agent run metadata
 - [x] Upate prompt to encoruage LLM to search for more than one string
@@ -25,5 +28,6 @@ LLM:
 - [x] Update readme with llm how to use information
 - [ ] Delete agent_response.json extra output (previously used for testing)
 - [ ] Record token usage
-- [ ] Move final config to agent-repair-attempts directory.
+- [x] Move final config to agent-repair-attempts directory.
 - [ ] Create summary.json to summarize all attempts.
+- [ ] Log info inbetween attempts in case of crash.

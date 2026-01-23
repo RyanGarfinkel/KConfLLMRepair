@@ -14,16 +14,22 @@ class Context:
     @property
     def system_prompt(self) -> SystemMessage:
         return SystemMessage(content=f"""
-            You are an expert Linux kernel configuration agent. Your objective is to repair a non-booting Linux kernel configuration
-            while minimizing the number of configuration changes. You will be have tools available to search through the build log,
-            kloclalizer log, the QEMU boot log, and be able to search through options in the base (bootable) and the latest (unbootable)
-            configuration. The purpose of the original changes was to maximize patch coverage for fuzz testing, but they have resulted in
-            a non-booting kernel.\n
-            
-            You will only be able to use each tool at most once per iteration, an you should try to minimize the number of iterations.
-            You will have at most {settings.agent.MAX_ITERATIONS} tries. Please maximize the use of the search tools availble to get as much
-            information as you need to make informed decisions about which configuration options to change. You should only make changes
-            that are necessary to fix the boot issue.
+            ROLE: You are an expert Linux kernel configuration agent tasked with repairing a non-booting kernel configuration.
+            WORKFLOW:
+            1. Diagnosis & Investigation:
+            - You must first search the QEMU boot log (if previous build didn't fail) then the build log to identify the root cause of
+              the boot failure.
+            - You have access to the patch file that caused some options to change. Search through it to understand why.
+            2. Verification:
+            - Do not guess configuration names. Search the base and the latest configuration files to see what options changed and cross
+              reference that with the errors found in the logs.
+            3. Action:
+            - Only after gathering sufficient information from the logs and config files, call 'apply_and_test'. 
+            CONSTRAINTS:
+            - You have at most {settings.agent.MAX_ITERATIONS} iterations to fix the configuration.
+            - You should minimize the number of configuration changes made.
+            - You can only use the 'apply_and_test' tool once per iteration.
+            - You should make use of the search tools to gather as much information as possible before making changes.
         """)
     
     def user_prompt(self, log) -> HumanMessage:
@@ -41,7 +47,7 @@ class Context:
 
         content += """
             INSTRUCTIONS:\n
-            1. Use all the tools available at most once. Start by gathering information about the failure by searching the logs, then
+            1. Use all the tools available. Start by gathering information about the failure by searching the logs, then
                search the configuration options to find the ones that are most likely to be the cause of the failure. Finally, make the
                apply and test new configuration changes.\n
             2. Once you have made new changes, new logs and a new latest configuration will become available. Use that new information to
@@ -73,5 +79,6 @@ class Context:
             STEP {i} / {settings.agent.MAX_ITERATIONS}:\n
             THOUGHTS: {iteration.thoughts}\n
             OBSERVATIONS: {iteration.observations}\n
-            SUGGESTIONS: {iteration.suggestions}\n
+            ACTIONS TAKEN: {iteration.actions}\n
+            SUGGESTED NEXT STEPS: {iteration.next_steps}\n
         """
