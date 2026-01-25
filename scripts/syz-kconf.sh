@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+ROOT=$(pwd)
+
+# Input
+
 KERNEL_SRC=$1
 OUTPUT=$2
 INSTANCE=${3:-upstream-apparmor-kasan}
@@ -22,4 +26,10 @@ mkdir -p "$(dirname "$OUTPUT")"
 # Run syz-kconf
 $SYZ_KCONF -config $MAIN_YML -instance $INSTANCE -sourcedir $KERNEL_SRC
 
-cp "$SYZKALLER_SRC/dashboard/config/linux/$INSTANCE.config" "$OUTPUT"
+cp "$SYZKALLER_SRC/dashboard/config/linux/$INSTANCE.config" "$KERNEL_SRC/.config"
+
+cd "$KERNEL_SRC"
+make LLVM=1 olddefconfig > /dev/null
+cd "$ROOT"
+
+cp "$KERNEL_SRC/.config" "$OUTPUT"
