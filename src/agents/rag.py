@@ -154,12 +154,12 @@ class RAG:
     def search(self, query: str) -> str:
         
         if not self.vector_store:
-            print(f'No vector store available for type {self.type}.') # Debug print
             self.queries.append({
                 'file': self.type,
                 'query': query,
                 'results': 'No data available. File not found.',
             })
+            
             return 'No data available. File not found.'
         
         results = self.vector_store.similarity_search(query, k=settings.agent.MAX_MATCHES)
