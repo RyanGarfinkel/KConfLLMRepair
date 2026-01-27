@@ -26,6 +26,22 @@ patch_separators = [
     'Binary files '
 ]
 
+klocalizer_separators =  [
+    '\nTraceback (most recent call last):',
+    '\nERROR:',
+    '\nWARNING: Failed to compute',
+    '\nWARNING: Syntax analysis',
+    '\nINFO: Build with',
+    '\nINFO: Trying',
+    '\nINFO: Computing line',
+    '\nINFO: Sampling and writing',
+    '\n[STEP 1/3]',
+    '\n[STEP 2/3]',
+    '\n[STEP 3/3]',
+    '\nWARNING:',
+    '\nINFO:',
+]
+
 build_separators = [
     '\n',
     '\nHOSTCC ',
@@ -68,6 +84,7 @@ qemu_separators = [
 
 SPLITTER_CONFIGS = {
     'patch': {'chunk_size': 3000, 'chunk_overlap': 500},
+    'klocalizer': {'chunk_size': 3000, 'chunk_overlap': 500},
     'build': {'chunk_size': 1500, 'chunk_overlap': 300},
     'qemu':  {'chunk_size': 1200, 'chunk_overlap': 300},
 }
@@ -82,6 +99,10 @@ class RAG:
             self.separators = patch_separators
             self.chunk_size = SPLITTER_CONFIGS['patch']['chunk_size']
             self.chunk_overlap = SPLITTER_CONFIGS['patch']['chunk_overlap']
+        elif type == 'klocalizer':
+            self.separators = klocalizer_separators
+            self.chunk_size = SPLITTER_CONFIGS['klocalizer']['chunk_size']
+            self.chunk_overlap = SPLITTER_CONFIGS['klocalizer']['chunk_overlap']
         elif type == 'build':
             self.separators = build_separators
             self.chunk_size = SPLITTER_CONFIGS['build']['chunk_size']
@@ -102,7 +123,7 @@ class RAG:
     def __get_embedding_model(self):
 
         if settings.agent.PROVIDER == 'google':
-            return GoogleGenerativeAIEmbeddings('text-embedding-004', api_key=settings.agent.GOOGLE_API_KEY)
+            return GoogleGenerativeAIEmbeddings(model='text-embedding-004', api_key=settings.agent.GOOGLE_API_KEY)
         else:
             return OpenAIEmbeddings(api_key=settings.agent.OPENAI_API_KEY)
         
@@ -133,15 +154,13 @@ class RAG:
     def search(self, query: str) -> str:
         
         if not self.vector_store:
-            print(f'No vector store available for type {self.type}.')
+            print(f'No vector store available for type {self.type}.') # Debug print
             self.queries.append({
                 'file': self.type,
                 'query': query,
                 'results': 'No data available. File not found.',
             })
             return 'No data available. File not found.'
-        
-        print(f'Vector store found for type {self.type}, performing similarity search...')
         
         results = self.vector_store.similarity_search(query, k=settings.agent.MAX_MATCHES)
 
@@ -151,9 +170,6 @@ class RAG:
                 'query': query,
                 'results': [doc.page_content for doc in results],
             })
-        
-        print('results')
-        print(self.queries[-1]['results'])
 
         return '\n'.join(self.queries[-1]['results'])
     

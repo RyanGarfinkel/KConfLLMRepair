@@ -1,35 +1,19 @@
 {
     "sampling_parameters": {
-        "start": 51974,
-        "k": 161939,
-        "n": 3,
-        "total_commits": 485828,
+        "start": 134823,
+        "k": 485801,
+        "n": 1,
+        "total_commits": 485821,
         "latest_commit": "2026-01-16T13:44:37+00:00",
-        "earliest_commit": "2019-12-31T12:27:08+00:00"
+        "earliest_commit": "2020-01-01T08:43:28+01:00"
     },
     "samples": [
         {
-            "end_commit": "6d0e2ada3ee5a554e908178d1fce851f5e63943d",
-            "start_commit": "2d278488761f0b5be651a3db41e615a964123d6c",
-            "end_commit_date": "2025-05-14T10:11:40+01:00",
-            "commit_window": 10,
+            "end_commit": "783d6cdc8231f625c42a367396ae534b15e67ebc",
+            "start_commit": "1560d1f6eb6b398bddd80c16676776c0325fe5fe",
+            "end_commit_date": "2024-04-22T09:03:09-04:00",
+            "commit_window": 20,
             "dir": "/home/ubuntu/KConfLLMRepair/workspace/samples/sample_0",
-            "isBaseBootable": true
-        },
-        {
-            "end_commit": "befcc1fce564bdb20ee55be981a355b0a7d0eac5",
-            "start_commit": "56cd3d1c5c5b073a1a444eafdcf97d4d866d351a",
-            "end_commit_date": "2023-05-13T20:58:17+01:00",
-            "commit_window": 10,
-            "dir": "/home/ubuntu/KConfLLMRepair/workspace/samples/sample_1",
-            "isBaseBootable": true
-        },
-        {
-            "end_commit": "8ea2e1e35d1eb4c76290ff5d565a1bfd6c24f117",
-            "start_commit": "90b669d65d99a3ee6965275269967cdee4da106e",
-            "end_commit_date": "2021-04-21T18:17:35+00:00",
-            "commit_window": 10,
-            "dir": "/home/ubuntu/KConfLLMRepair/workspace/samples/sample_2",
             "isBaseBootable": true
         }
     ]

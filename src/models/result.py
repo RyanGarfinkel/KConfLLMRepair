@@ -14,16 +14,22 @@ class AgentResult:
     iterations: int
 
     config: str
-    token_usage: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
 
     history: List[IterationSummary] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
+            'provider': self.provider,
+            'model': self.model,
             'status': self.status,
             'iterations': self.iterations,
             'config': self.config,
-            'token_usage': self.token_usage,
+            'input_tokens': self.input_tokens,
+            'output_tokens': self.output_tokens,
+            'total_tokens': self.total_tokens,
             'history': [iteration.to_dict() for iteration in self.history],
         }
     

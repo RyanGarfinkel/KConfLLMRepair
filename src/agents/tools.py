@@ -14,6 +14,11 @@ class Tools:
         self.kernel = Kernel(sample.kernel_src)
         self.succeeded = False
         self.attempt = 1
+        # self.option_map = self.kernel.repo.get_option_mapping()
+
+        # with open(f'{self.sample.output}/attempt_{self.attempt - 1}/options.json', 'w') as f:
+        #     import json
+        #     json.dump(self.option_map, f, indent=4)
         
         if not os.path.exists(f'{self.sample.output}/attempt_0'):
             raise Exception(f'Output directory {self.sample.output}/attempt_0 does not exist. Please run the initial attempt first.')
@@ -23,6 +28,11 @@ class Tools:
         self.patch_rag = RAG(
             path=f'{self.sample.output}/attempt_{self.attempt - 1}/changes.patch',
             type='patch'
+        )
+
+        self.klocalizer_log = RAG(
+            path=f'{self.sample.output}/attempt_0/klocalizer.log',
+            type='klocalizer'
         )
 
         self.build_log = RAG(
@@ -69,9 +79,10 @@ class Tools:
     @property
     def tools_used(self) -> list[dict]:
         
-        used = self.used + self.patch_rag.queries + self.build_log.queries + self.qemu_log.queries
+        used = self.used + self.patch_rag.queries + self.klocalizer_log.queries + self.build_log.queries + self.qemu_log.queries
         self.used = []
         self.patch_rag.queries = []
+        self.klocalizer_log.queries = []
         self.build_log.queries = []
         self.qemu_log.queries = []
 
@@ -112,7 +123,10 @@ class Tools:
         Returns:
             list[str]: A list of values of the options searched for that were found in the KLocalizer config file.
         """
-
+        
+        if os.path.exists(self.latest_config) == False:
+            return ['Latest config file does not exist. Check the klocalizer log for errors.']
+        
         config = KConfig(self.latest_config)
 
         values = []
@@ -165,16 +179,18 @@ class Tools:
             'boot_succeeded': False,
         })
 
+        self.klocalizer_log.reload(None)
         self.build_log.reload(None)
         self.qemu_log.reload(None)
         self.attempt += 1
 
         self.kernel.load_config(self.base_config.path)
-        if not self.kernel.run_klocalizer(attempt_dir, define, undefine):
+        klocalizer_succeeded = self.kernel.run_klocalizer(attempt_dir, define, undefine)
+        self.klocalizer_log.reload(f'{attempt_dir}/klocalizer.log')
+        if not klocalizer_succeeded:
             return ['KLocalizer failed to apply the configuration changes.']
         
         self.used[-1]['klocalizer_succeeded'] = True
-
         
         kernel_built = self.kernel.build(f'{attempt_dir}/modified.config', f'{attempt_dir}/build.log')
         self.build_log.reload(f'{attempt_dir}/build.log')
@@ -207,6 +223,10 @@ class Tools:
             self.patch_rag.as_tool(
                 name='search_patch',
                 desc='Search the patch file for relevant information about code changes made in this attempt.'
+            ),
+            self.klocalizer_log.as_tool(
+                name='search_klocalizer_log',
+                desc='Search the KLocalizer log for relevant information about configuration changes applied during this attempt.'
             ),
             self.build_log.as_tool(
                 name='search_build_log',

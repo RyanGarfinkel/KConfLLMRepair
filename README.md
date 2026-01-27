@@ -18,7 +18,7 @@ Please the follow the [.env.template](.env.template) to setup you `.env` file
 The repair script attempts to repair only one configuration at a time. See the [experiment section](#running-the-experiment) to repair more than one configuration at once. Additional options can be passed in to control the model used during the repair, amount of iterations, number of parallel jobs when building the kernel, and where to direct the output. See the table below. See the [output format](#output-format) for more information.
 
 ```bash
-python3 -m src.scripts.repair --base base.config --modified modified.config --patch changes.patch --kernel-src $KERNEL_SRC
+python3 -m src.cli.repair --base base.config --modified modified.config --patch changes.patch --kernel-src $KERNEL_SRC
 ```
 
 ### Repair Options

@@ -35,7 +35,9 @@ class Executor:
             print('No structured response found in agent output.')
 
         tool_calls = []
-        token_usage = 0
+        input_tokens = 0
+        output_tokens = 0
+        total_tokens = 0
         for message in response.get('messages', []):
             if isinstance(message, AIMessage):
 
@@ -43,11 +45,15 @@ class Executor:
                     tool_calls.extend(message.tool_calls)
                 
                 if message.usage_metadata:
-                    token_usage += message.usage_metadata.get('total_tokens', 0)
+                    input_tokens += message.usage_metadata.get('input_tokens', 0)
+                    output_tokens += message.usage_metadata.get('output_tokens', 0)
+                    total_tokens += message.usage_metadata.get('total_tokens', 0)
 
         return IterationSummary(
             executor_summary=executor_summary,
-            token_usage=token_usage,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            total_tokens=total_tokens,
             tools_used=tool_calls,
         )
 

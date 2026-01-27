@@ -9,7 +9,7 @@ import os
 def update_provider(model: str | None):
 
         if model is None:
-            model = 'gpt-5.2' if settings.agent.OPENAI_API_KEY else 'gemini-2.5-flash' if settings.agent.GOOGLE_API_KEY else None
+            model = 'gpt-5.2' if settings.agent.OPENAI_API_KEY else 'gemini-3-pro-preview' if settings.agent.GOOGLE_API_KEY else None
 
         if model is None:
             raise ValueError('Must have at least one valid API key to initialize LLM.')

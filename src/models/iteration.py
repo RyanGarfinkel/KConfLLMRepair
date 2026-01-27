@@ -6,13 +6,17 @@ from typing import Any
 class IterationSummary:
 
     executor_summary: 'ExecutorSummary'
-    token_usage: int
+    input_tokens: int
+    output_tokens: int
+    total_tokens: int
     tools_used: dict
     
     def to_dict(self) -> dict[str, Any]:
         return {
             'executor_summary': self.executor_summary.model_dump(),
-            'token_usage': self.token_usage,
+            'input_tokens': self.input_tokens,
+            'output_tokens': self.output_tokens,
+            'total_tokens': self.total_tokens,
             'tools_used': self.tools_used
         }
 

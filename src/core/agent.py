@@ -29,6 +29,20 @@ class Agent:
         tools = Tools(sample)
         executor = Executor(self.llm, tools.get_tools())
 
+        config = f'{sample.output}/.config'
+
+        result = AgentResult(
+            provider=settings.agent.PROVIDER,
+            model=settings.agent.MODEL,
+            iterations=0,
+            history=[],
+            config=config,
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            status='failure'
+        )
+
         for i in range(settings.agent.MAX_ITERATIONS):
 
             if tools.succeeded:
@@ -47,17 +61,18 @@ class Agent:
 
             iter_summary.tools_used = tools.tools_used
 
+            result.iterations += 1
+            result.history.append(iter_summary)
+            result.input_tokens += iter_summary.input_tokens
+            result.output_tokens += iter_summary.output_tokens
+            result.total_tokens += iter_summary.total_tokens
+            result.status = 'success' if tools.succeeded else 'max_iterations' if i == settings.agent.MAX_ITERATIONS - 1 else 'failure'
+            result.save(f'{sample.output}/result.json')
+
+            iter_summary.tools_used = tools.tools_used
+
             context.history.append(iter_summary)
 
-        config = f'{sample.output}/.config'
         shutil.copyfile(f'{sample.output}/attempt_{len(context.history)}/modified.config', config)
 
-        return AgentResult(
-            provider=settings.agent.PROVIDER,
-            model=settings.agent.MODEL,
-            iterations=len(context.history),
-            history=context.history,
-            config=config,
-            token_usage=sum(iter_summary.token_usage for iter_summary in context.history),
-            status='success' if tools.succeeded else 'max_iterations' if len(context.history) == settings.agent.MAX_ITERATIONS else 'failure'
-        )
+        return result
