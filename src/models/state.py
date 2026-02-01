@@ -1,25 +1,46 @@
-from typing import Annotated, List, Literal, TypedDict, Optional
+from typing import Annotated, List, Literal, TypedDict, Optional, Any, Dict
+from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
-from src.core import Kernel
-from operator import add
+
+class TokenUsage(BaseModel):
+    
+    input_tokens: int = Field(..., frozen=True, ge=0)
+    output_tokens: int = Field(..., frozen=True, ge=0)
+    total_tokens: int = Field(..., frozen=True, ge=0)
 
 class ToolCall(BaseModel):
 
     name: str = Field(..., frozen=True)
-    args: dict[str, str] = Field(..., frozen=True)
-    return_content: dict = Field(..., frozen=True)
-    token_usage: dict['input_tokens': int, 'output_tokens': int, 'total_tokens': int] = Field(..., frozen=True)
+    args: Dict[str, Any] = Field(..., frozen=True)
+    return_content: Dict[str, Any] = Field(..., frozen=True)
+    token_usage: TokenUsage = Field(..., frozen=True)
 
 class Phase(BaseModel):
 
     name: Literal['verify', 'analyze', 'collect'] = Field(...)
     tool_calls: List[ToolCall] = Field(default_factory=list)
+    
+    @property
+    def total_token_usage(self) -> TokenUsage:
+        input = sum(call.token_usage.input_tokens for call in self.tool_calls)
+        output = sum(call.token_usage.output_tokens for call in self.tool_calls)
+
+        return TokenUsage(
+            input_tokens=input,
+            output_tokens=output,
+            total_tokens=input + output
+        )
+
+class Guess(BaseModel):
+    
+    guess: str = Field(..., frozen=True)
+    status: Literal['discarded', 'success', 'failed'] = Field(..., frozen=True)
 
 class Hypothesis(BaseModel):
     
     current: Optional[str] = Field(default=None)
-    history: List[dict['guess': str, 'status': Literal['discarded', 'success', 'failed']]] = Field(default_factory=list)
+    history: List[Guess] = Field(default_factory=list)
 
 class Attempt(BaseModel):
 
@@ -29,81 +50,16 @@ class Attempt(BaseModel):
     build_log: Optional[str] = Field(default=None)
     boot_log: Optional[str] = Field(default=None)
 
-
 class State(TypedDict):
 
-    messages: Annotated[List[BaseMessage], add]
-    
+    messages: Annotated[List[BaseMessage], add_messages]
+
     hypothesis: Hypothesis
     phases: List[Phase]
-    
-    kernel: Kernel
     
     sample_dir: str
     
     base_config: str
     patch: str
     
-    attempts: List[Attempt] = Field(default_factory=list)
-    @property
-    def num_attempts(self) -> int:
-        return len(self.attempts)
-
-
-
-
-
-
-
-
-
-
-# from langchain_core.language_models import BaseChatModel
-# from langchain_core.messages import BaseMessage
-# from typing import Annotated, List, Optional
-# from typing_extensions import Literal
-# from pydantic import BaseModel, Field
-# from src.core import Kernel
-# from operator import add
-
-# class Hypothesis(BaseModel):
-    
-#     text: str = Field(...)
-#     status: Literal['current', 'discarded', 'success', 'failed'] = Field(default='current')
-
-# class Counter(BaseModel):
-
-#     tool_count: int = Field(default=0, ge=0)
-#     repair_attempts: int = Field(default=0, ge=0)
-#     test_attempts: int = Field(default=0, ge=0)
-
-# class State(BaseModel):
-
-#     llm: BaseChatModel = Field(..., frozen=True)
-
-#     messages: Annotated[List[BaseMessage], add] = Field(default_factory=list)
-#     phase: Literal['init', 'verify', 'analyze', 'collect', 'done'] = Field(default='init')
-
-#     @property
-#     def current_hypothesis(self) -> Optional[Hypothesis]:
-#         for hypothesis in self.hypotheses:
-#             if hypothesis.status == 'current':
-#                 return hypothesis
-            
-#         return None
-
-#     hypotheses: List[Hypothesis] = Field(default_factory=list)
-
-#     patch: str = Field(..., frozen=True)
-#     base_config: str = Field(..., frozen=True)
-#     sample_dir: str = Field(..., frozen=True)
-
-#     latest_config: str = Field(...)
-#     latest_klocalizer: Optional[str] = Field(default=None)
-#     latest_build: Optional[str] = Field(default=None)
-#     latest_boot: Optional[str] = Field(default=None)
-
-#     kernel: Kernel = Field(..., frozen=True)
-
-#     counter: Counter = Field(default_factory=Counter)
-#     boot_succeeded: bool = Field(default=False)
+    attempts: List[Attempt]

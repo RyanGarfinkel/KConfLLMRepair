@@ -30,6 +30,7 @@ class RuntimeSettings(BaseModel):
     SAMPLE_DIR: str
     WORKTREE_DIR: str
     BASE_CONFIG: str
+    CHUNK_WINDOW: int = 20
 
     @field_validator('SAMPLE_DIR', 'WORKTREE_DIR')
     def validate(cls, v: str) -> str:

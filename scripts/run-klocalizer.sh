@@ -28,13 +28,15 @@ fi
 cd $KERNEL_SRC
 rm -f "$LOG_FILE"
 
-klocalizer --superc-linux-script "$SUPERC_PATH" \
-           --include-mutex "$PATCH_FILE" \
-           --cross-compiler gcc \
-           --arch "$ARCH" \
-           "${EXTRA_ARGS[@]}" > "$LOG_FILE" 2>&1 || \
+LLVM=1 CC="clang -fintegrated-as" LD=ld.lld \
+        klocalizer -a x86_64 \
+        --repair "$KERNEL_SRC/.config" \
+        --include-mutex $PATCH_FILE \
+        --constraints-file $CONFIG_CONSTRAINTS \
+        "${EXTRA_ARGS[@]}" > "$LOG_FILE" 2>&1 || \
     { cd "$WORKING_DIR"; exit 1; }
 
 mv "0-$ARCH.config" ".config"
+make LLVM=1 ARCH=$ARCH olddefconfig
 
 cd "$WORKING_DIR"

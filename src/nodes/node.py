@@ -1,8 +1,9 @@
 from langchain_core.messages import SystemMessage, AIMessage
+from langchain.core.runnable import RunnableConfig
 from .tool import analyze_tools, collect_tools
-from src.models import State, Phase
 from abc import ABC, abstractmethod
 from src.config import settings
+from src.models import State
 from typing import Literal
 from typing import final
 
@@ -32,7 +33,7 @@ class Node(ABC):
         pass
 
     @final
-    def __call__(self, state: State) -> dict:
+    def __call__(self, state: State, config: RunnableConfig) -> dict:
 
         # Agent Setup
         if self.name == 'analyze':
@@ -42,11 +43,11 @@ class Node(ABC):
         else:
             agent = settings.agent.LLM
 
-        prompt = [self.system_message, self.state_message] + state.messages[-settings.agent.MAX_CONTENT_MESSAGES:]
+        prompt = [self.system_message, self.state_message] + state.get('messages')[-settings.agent.MAX_CONTENT_MESSAGES:]
 
-        # Agent Execution & Response Handeling
+        # Agent Execution & Response Handling
         response = agent.invoke(prompt)
         
-        result = self._handle_response(response, state)
+        result = self._handle_response(response, state, config)
 
         return result
