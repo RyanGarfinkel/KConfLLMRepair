@@ -1,5 +1,6 @@
 from pydantic import field_validator, model_validator, ValidationInfo, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from langchain_core.language_models import BaseChatModel
 from src.utils import log
 import sys
 import os
@@ -44,6 +45,8 @@ class AgentSettings(BaseModel):
     PROVIDER: str = 'openai'
     MODEL: str = 'gpt-5.2'
     MAX_MATCHES: int = 5
+    MAX_CONTENT_MESSAGES: int = 10
+    LLM: BaseChatModel | None = None
 
     @model_validator(mode='after')
     def verify_api_key(self):

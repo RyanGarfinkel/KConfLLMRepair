@@ -18,13 +18,23 @@ rm -f "$LOG_FILE"
 cd "$WORKING_DIR"
 
 qemu-system-x86_64 -m 2G -smp 1 -kernel "$BZ_IMG" \
-    -append "console=ttyS0 root=/dev/vda1 ro init=/sbin/init earlyprintk=serial net.ifnames=0 selinux=0 systemd.mask=networking.service systemd.mask=ifupdown-pre.service systemd.mask=systemd-rfkill.service" \
-    -drive file="$DEBIAN_IMG",format=raw,if=virtio \
+    -append "console=ttyS0 root=/dev/sda1 rw init=/sbin/init earlyprintk=serial net.ifnames=0 selinux=0" \
+    -drive file="$DEBIAN_IMG",format=raw \
     -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22 \
-    -net nic,model=virtio \
-    -device virtio-rng-pci \
+    -net nic,model=e1000 \
     -cpu max \
     -nographic > "$LOG_FILE" 2>&1 &
+
+# qemu-system-x86_64 \
+#     -m 2G \
+#     -smp 2 \
+#     -kernel "$BZ_IMG" \
+#     -append "console=ttyS0 root=/dev/sda earlyprintk=serial net.ifnames=0" \
+#     -drive file="$DEBIAN_IMG",format=raw \
+#     -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22 \
+#     -net nic,model=e1000 \
+#     -enable-kvm \
+#     -nographic > "$LOG_FILE" 2>&1 &
 
 # Waiting for Login Prompt
 PID=$!

@@ -21,7 +21,7 @@ make LLVM=1 olddefconfig > /dev/null
 # Building the kernel
 rm -f $LOG_FILE
 
-yes "" | make -j$JOB_COUNT LD=ld.lld ARCH=$ARCH CC="ccache gcc" CROSS_COMPILE=$CROSS_COMPILE bzImage > $LOG_FILE 2>&1 || \
+yes "" | make -j$JOB_COUNT LLVM=1 ARCH=$ARCH bzImage > $LOG_FILE 2>&1 || \
     { exit 1; }
 
 cd $WORKING_DIR

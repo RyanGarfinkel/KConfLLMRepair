@@ -1,78 +1,68 @@
-from langchain_google_genai import ChatGoogleGenerativeAI
-from src.agents import Context, Executor, Tools
-from src.models import Sample, AgentResult
+from langgraph.graph import StateGraph, START, END
+from src.nodes import verify, analyze, collect
 from singleton_decorator import singleton
-from langchain_openai import ChatOpenAI
-from src.config import settings
-from src.utils import log
-import shutil
+from src.models import State, Sample
+from .kernel import Kernel
 
 @singleton
 class Agent:
 
     def __init__(self):
 
-        self.llm = self.__get_llm(settings.agent.MODEL)
+        self.workflow = StateGraph(State)
 
-    def __get_llm(self, model: str):
+        # Nodes
+        self.workflow.add_node('verify', verify.build_and_boot)
+        self.workflow.add_node('analyze', analyze.analyze)
+        self.workflow.add_node('collect', collect.collect)
 
-        if model.startswith('gpt'):
-            return ChatOpenAI(model=model, api_key=settings.agent.OPENAI_API_KEY)
-        elif model.startswith('gemini'):
-            return ChatGoogleGenerativeAI(model=model, api_key=settings.agent.GOOGLE_API_KEY)
-        else:
-            raise ValueError(f'Unknown provider for model: {model}')
-
-    def repair(self, sample: Sample) -> AgentResult:
-
-        context = Context()
-        tools = Tools(sample)
-        executor = Executor(self.llm, tools.get_tools())
-
-        config = f'{sample.output}/.config'
-
-        result = AgentResult(
-            provider=settings.agent.PROVIDER,
-            model=settings.agent.MODEL,
-            iterations=0,
-            history=[],
-            config=config,
-            input_tokens=0,
-            output_tokens=0,
-            total_tokens=0,
-            status='failure'
+        # Edges
+        self.workflow.add_edge(START, 'verify')
+        
+        self.workflow.add_conditional_edges(
+            'verify',
+            verify.route,
+            {
+                'analyze': 'analyze',
+                END: END,
+            }
         )
 
-        for i in range(settings.agent.MAX_ITERATIONS):
+        self.workflow.add_conditional_edges(
+            'analyze',
+            analyze.route,
+            {
+                'verify': 'verify',
+                'collect': 'collect',
+            }
+        )
 
-            if tools.succeeded:
-                break
+        self.workflow.add_conditional_edges(
+            'collect',
+            collect.route,
+            {
+                'analyze': 'analyze',
+                'verify': 'verify',
+            }
+        )
 
-            log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS}...')
+        # Compile
+        self.agent = self.workflow.compile()
 
-            system_prompt = context.system_prompt
-            user_prompt = context.user_prompt(tools.latest_log)
+    def repair(self, sample: Sample) -> dict:
+        
+        kernel = Kernel(sample.kernel_src)
 
-            iter_summary = executor.iterate(system_prompt, user_prompt)
+        initial_state = State(
+            patch=sample.patch,
+            base_config=sample.base_config,
+            sample_dir=sample.sample_dir,
+            latest_config=sample.base_config,
+            kernel=kernel,
+        )
 
-            if iter_summary is None:
-                log.info(f'No output from agent in iteration {i + 1}. Ending.')
-                break
+        final_state = self.agent.run(initial_state)
 
-            iter_summary.tools_used = tools.tools_used
+        return final_state.model_dump()
 
-            result.iterations += 1
-            result.history.append(iter_summary)
-            result.input_tokens += iter_summary.input_tokens
-            result.output_tokens += iter_summary.output_tokens
-            result.total_tokens += iter_summary.total_tokens
-            result.status = 'success' if tools.succeeded else 'max_iterations' if i == settings.agent.MAX_ITERATIONS - 1 else 'failure'
-            result.save(f'{sample.output}/result.json')
-
-            iter_summary.tools_used = tools.tools_used
-
-            context.history.append(iter_summary)
-
-        shutil.copyfile(f'{sample.output}/attempt_{len(context.history)}/modified.config', config)
-
-        return result
+agent = Agent()
