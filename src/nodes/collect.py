@@ -1,88 +1,142 @@
+from langchain_core.messages import SystemMessage, ToolMessage, AIMessage
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import SystemMessage
-from singleton_decorator import singleton
-from langchain.tools import tool
+from src.toolkit import collect_tools
+from functools import cached_property
+from src.config import settings
+from src.models import State
+from src.core import Kernel
 from .node import Node
+import shutil
 import os
 
-@singleton
 class CollectNode(Node):
 
-    def __init__(self, llm: BaseChatModel):
-        super().__init__(llm)
-        self.state_description = SystemMessage(content=
-        """
-            You are currently in the collect phase of the kernel boot repair process. Your goal in this phase is to gather information
-            from the original, bootable, configuration and the latest, non-bootable, configuration to either confirm or refute the current
-            hypothesis. When you have sufficient evidence to support your hypothesis, run the kloclaizer tool and specify which options
-            to define and undefine. If you do not have sufficient evidence, you may discard your current hypothesis and return to the analyze phase.                                          
-        """)
+    def __init__(self, llm: BaseChatModel, kernel: Kernel):
+        super().__init__(llm, 'collect')
+        self.kernel = kernel
+    
+    @cached_property
+    def state_message(self) -> SystemMessage:
+        return SystemMessage(content=
+            """
+                You are currently in the collect phase of the kernel boot repair process. Your goal in this phase is to gather information
+                from the original, bootable, configuration and the latest, non-bootable, configuration to either confirm or refute the current
+                hypothesis. When you have sufficient evidence to support your hypothesis, run the kloclaizer tool and specify which options
+                to define and undefine. If you do not have sufficient evidence, you may discard your current hypothesis and return to the analyze
+                phase. Do not run the klocalizer tool and the discard_hypothesis tool in the same response. You may only run klocizer once per
+                response and will have a few chances to get it right before needing to return to the analyze phase. If klocalizer succeeds, you
+                will move directly to the verify phase.                                          
+            """)
+    
+    def tools(self, state: State):
+        return collect_tools(state.get('base_config'), state.get('modified_config'), state.get('patch'), self.kernel)
 
-    def collect(self, state) -> dict:
-        pass
+    def tool_map(self, state: State):
+        return {tool.name: tool for tool in self.tools(state)}
+    
+    def _handle_response(self, response: AIMessage, state: State) -> dict:
+        
+        new_messages = [response]
 
-    def route(self, state) -> str:
+        tool_count = state.get('tool_calls', 0)
+        modified_config = state.get('modified_config')
+        klocalizer_log = state.get('klocalizer_log')
+        klocalizer_runs = state.get('klocalizer_runs', 0)
+        hypothesis = state.get('hypothesis')
         
-        if state.current_hypothesis is None:
-            return 'analyze'
-        
-        if state.messages[-1].tool_calls and state.messages[-1].tool_calls[0]['name'] == 'run_klocalizer':
-            return 'analyze'
+        search_calls = [call for call in response.tool_calls if call['name'].startswith('search_')]
+        klocalizer_calls = [call for call in response.tool_calls if call['name'] == 'run_klocalizer']
+        hypothesis_calls = [call for call in response.tool_calls if call['name'] == 'discard_hypothesis']
 
-    def __get_tools(self, base_config: str, latest_config: str) -> list[callable]:
+        tool_map = self.tool_map(state)
+
+        for call in search_calls:
+
+            if tool_count >= settings.agent.MAX_TOOL_CALLS:
+                break
+
+            name = call['name']
+            args = call.get('args', {})
+
+            new_messages.append(ToolMessage(
+                tool_call_id=call['id'],
+                name=name,
+                content=tool_map[name](**args)
+            ))
+
+            tool_count += 1
         
-        @tool
-        def discard_hypothesis() -> None:
-            """
-            Discards the current hypothesis and returns to the analyze phase to form a new hypothesis.
-            Args: None
-            Returns: None
-            """
-            return None
-        
-        @tool
-        def search_base_config(options: list[str]) -> list[str]:
-            """
-            Searches the base configuration for the specified options and returns their values.
-            Args:
-                options (list[str]): A list of options to search for.
-            Returns:
-                list[str]: A list of strings in the format "OPTION=VALUE" for each option.
-            """
+        klocalizer_succeeded = False
+        attempt_dir = f'{state.get('output_dir')}/attempt_{state.get('verify_attempts', 0)}'  
+        for call in klocalizer_calls:
+
+            if tool_count >= settings.agent.MAX_TOOL_CALLS:
+                break
+
+            name = call['name']
+            args = call.get('args', {})
+
+            if klocalizer_runs >= settings.agent.MAX_KLOCALIZER_RUNS:
+                new_messages.append(ToolMessage(
+                    tool_call_id=call['id'],
+                    name=name,
+                    content='ERROR: Maximum number of KLocalizer runs reached during this collect phase. This call is skipped.'
+                ))
+            elif klocalizer_succeeded:
+                new_messages.append(ToolMessage(
+                    tool_call_id=call['id'],
+                    name=name,
+                    content='Klocalizer already succeeded in a previous call. This call is skipped.'
+                ))
+            else:
+                klocalizer_runs += 1
+                
+                os.makedirs(attempt_dir, exist_ok=True)
+
+                new_messages.append(ToolMessage(
+                    tool_call_id=call['id'],
+                    name=name,
+                    content=tool_map[name](**args)
+                ))
+
+                attempts = 0
+                while(os.path.exists(f'{attempt_dir}/klocalizer_{attempts}.log')):
+                    attempts += 1
+
+                if os.path.exists(f'{self.kernel.src}/klocalizer.log'): 
+                    shutil.move(f'{self.kernel.src}/klocalizer.log', f'{attempt_dir}/klocalizer_{attempts}.log')
+                    klocalizer_log = f'{attempt_dir}/klocalizer_{attempts}.log'
+
+
+                if new_messages[-1].content.startswith('SUCCESS'):
+                    klocalizer_succeeded = True
+                    modified_config = f'{attempt_dir}/modified_config_{attempts}.config'
+                    shutil.copyfile(f'{self.kernel.src}/.config', modified_config)
             
-            results = []
-            with open(base_config, 'r', errors='replace') as f:
-                lines = f.readlines()
-                for option in options:
-                    for line in lines:
-                        if line.startswith(option + '='):
-                            results.append(line.strip())
+            tool_count += 1
 
-            return results
+        if len(hypothesis_calls) > 0:
+            hypothesis = None
 
-        @tool
-        def search_latest_config(options: list[str]) -> list[str]:
-            """
-            Searches the latest configuration for the specified options and returns their values.
-            Args:
-                options (list[str]): A list of options to search for.
-            Returns:
-                list[str]: A list of strings in the format "OPTION=VALUE" for each option.
-            """
-
-            if not os.path.exists(latest_config):
-                return [latest_config + ' does not exist.']
+        for call in hypothesis_calls:
             
-            results = []
-            with open(latest_config, 'r', errors='replace') as f:
-                lines = f.readlines()
-                for option in options:
-                    for line in lines:
-                        if line.startswith(option + '='):
-                            results.append(line.strip())
+            if tool_count >= settings.agent.MAX_TOOL_CALLS:
+                break
+            
+            new_messages.append(ToolMessage(
+                tool_call_id=hypothesis_calls[0]['id'],
+                name='discard_hypothesis',
+                content='Hypothesis discarded.'
+            ))
 
-            return results
+            tool_count += 1
 
-        return [discard_hypothesis, search_base_config, search_latest_config]
-
-collect = CollectNode()
+        return {
+            'messages': new_messages,
+            'hypothesis': hypothesis,
+            'tool_calls': tool_count,
+            'klocalizer_runs': klocalizer_runs,
+            'klocalizer_succeeded': klocalizer_succeeded,
+            'modified_config': modified_config,
+            'klocalizer_log': klocalizer_log
+        }

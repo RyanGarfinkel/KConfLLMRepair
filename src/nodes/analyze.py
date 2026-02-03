@@ -1,16 +1,15 @@
-from langchain_core.messages import SystemMessage
-from singleton_decorator import singleton
-from src.models import State, Hypothesis
-from .tool import analyze_tools
+from langchain_core.messages import SystemMessage, AIMessage, ToolMessage
+from langchain_core.language_models import BaseChatModel
+from src.toolkit import analyze_tools
+from functools import cached_property
+from src.config import settings
+from src.models import State
 from .node import Node
 
-from functools import cached_property
-
-@singleton
 class AnalyzeNode(Node):
 
-    def __init__(self):
-        super().__init__('analyze')
+    def __init__(self, llm: BaseChatModel):
+        super().__init__(llm, 'analyze')
 
     @cached_property
     def state_message(self) -> SystemMessage:
@@ -19,47 +18,50 @@ class AnalyzeNode(Node):
                 You are currently in the analyze phase of the kernel boot repair process. Your goal in this phase is to form a hypothesis
                 about why the kernel is failing to boot successfully after the recent configuration changes made by klocalizer. You are
                 able to analyze the klocalizer log, build log, and QEMU boot log using the provided tools to gather evidence to form your
-                hypothesis. Once you have formed a hypothesis, you will express it using the express_hypothesis tool.                                               
+                hypothesis. Once you have formed a hypothesis, you will express it using the express_hypothesis tool. It is encouraged that
+                you first gather sufficient evidence before expressing your hypothesis to ensure its accuracy. Do not call the express_hypothesis
+                tool until you have queried the logs. Only call the express_hypothesis tool once per analyze phase.                                           
             """)
     
-    def _handle_response(self, response, state):
+    def tools(self, state: State):
+        return analyze_tools(state.get('patch'), state.get('klocalizer_log'), state.get('build_log'), state.get('boot_log'))
+    
+    def tool_map(self, state: State):
+        return {tool.name: tool for tool in self.tools(state)}
+    
+    def _handle_response(self, response: AIMessage, state: State) -> dict:
         
-        pass
-
-    def analyze(self, state: State) -> dict:
-        
-        # Agent Setup
-        tools = analyze_tools
-        tool_map = {tool.name: tool for tool in tools}
-
-        agent = self.llm.bind_tools(tools)
-
-        # Execute Agent and Tool Calls
-        response = agent.invoke(self._get_prompt(self.state_message, state.messages))
         new_messages = [response]
 
-        if response.tool_calls:
-            for call in response.tool_calls:
-                new_messages.append(self._execute_tool(call, tool_map))
+        tool_count = state.get('tool_calls', 0)
+        hypothesis = None
+        tool_map = self.tool_map(state)
 
-        # Check Hypothesis
-        expressed_hypothesis = next((call for call in response.tool_calls if call['name'] == 'express_hypothesis'), None)
-        hypotheses = state.hypotheses.copy()
+        for tool in response.tool_calls:
 
-        if expressed_hypothesis:
-            hypothesis = Hypothesis(text=expressed_hypothesis['args']['hypothesis'], status='current')
-            hypotheses.append(hypothesis)
+            if tool_count >= settings.agent.MAX_TOOL_CALLS:
+                break
+
+            name = tool['name']
+            args = tool.get('args', {})
+
+            new_messages.append(ToolMessage(
+                tool_call_id=tool['id'],
+                name=name,
+                content=tool_map[name](**args)
+            ))
+
+            if name == 'express_hypothesis':
+                hypothesis = new_messages[-1].content
+
+            tool_count += 1
+
 
         return {
             'messages': new_messages,
-            'hypotheses': hypotheses,
+            'hypothesis': hypothesis,
+            'tool_calls': tool_count,
+            'klocalizer_runs': 0,
+            'verify_succeeded': False,
+            'klocalizer_succeeded': False,
         }
-    
-    def router(self, state: State) -> str:
-
-        if state.current_hypothesis is not None:
-            return 'collect'
-        
-        return 'analyze'
-    
-analyze = AnalyzeNode()

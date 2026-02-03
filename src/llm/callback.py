@@ -18,6 +18,9 @@ class Callback(BaseCallbackHandler):
             self.session.start_phase('collect')
     
     def on_chain_end(self, outputs, **kwargs):
+        if not self.session.current_phase:
+            return
+            
         messages = outputs.get('messages', [])
         
         if self.session.current_phase.name == 'verify':

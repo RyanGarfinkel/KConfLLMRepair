@@ -15,3 +15,12 @@ class State(TypedDict):
     klocalizer_succeeded: bool
     verify_succeeded: bool
 
+    base_config: str
+    modified_config: str
+    patch: str
+
+    build_log: str
+    boot_log: str
+    klocalizer_log: str
+
+    output_dir: str

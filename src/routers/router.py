@@ -14,7 +14,7 @@ class Router(ABC):
         if state.get('tool_calls') >= settings.agent.MAX_TOOL_CALLS:
             return False
         
-        if state.get('verify_attempts') >= settings.agent.MAX_VERIFY_ATTEMPTS:
+        if state.get('verify_attempts') > settings.agent.MAX_VERIFY_ATTEMPTS:
             return False
         
         return True

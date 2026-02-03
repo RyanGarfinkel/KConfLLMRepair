@@ -1,15 +1,14 @@
 from langchain_core.messages import SystemMessage, AIMessage
-from langchain.core.runnable import RunnableConfig
-from .tool import analyze_tools, collect_tools
+from langchain_core.language_models import BaseChatModel
 from abc import ABC, abstractmethod
 from src.config import settings
 from src.models import State
 from typing import Literal
-from typing import final
 
 class Node(ABC):
 
-    def __init__(self, name: Literal['verify', 'analyze', 'collect', 'tool']):
+    def __init__(self, llm: BaseChatModel, name: Literal['verify', 'analyze', 'collect', 'tool']):
+        self.llm = llm
         self.name = name
         self.system_message = SystemMessage(content="""
             You are an expert Linux Kernel Engineer who specializes in boot repairs. The current configuration you are working on does
@@ -24,30 +23,21 @@ class Node(ABC):
     def state_message(self) -> SystemMessage:
         pass
 
+    def tools(self, state: State):
+        return []
+
     @abstractmethod
     def _handle_response(self, response: AIMessage, state: State) -> dict:
         pass
 
-    @abstractmethod
-    def router(self, state: State) -> str:
-        pass
-
-    @final
-    def __call__(self, state: State, config: RunnableConfig) -> dict:
+    def __call__(self, state: State) -> dict:
 
         # Agent Setup
-        if self.name == 'analyze':
-            agent = settings.agent.LLM.bind_tools(analyze_tools)
-        elif self.name == 'collect':
-            agent = settings.agent.LLM.bind_tools(collect_tools)
-        else:
-            agent = settings.agent.LLM
-
+        agent = self.llm.bind_tools(self.tools(state))
         prompt = [self.system_message, self.state_message] + state.get('messages')[-settings.agent.MAX_CONTENT_MESSAGES:]
 
         # Agent Execution & Response Handling
         response = agent.invoke(prompt)
-        
-        result = self._handle_response(response, state, config)
+        result = self._handle_response(response, state)
 
         return result

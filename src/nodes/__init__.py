@@ -1,3 +1,3 @@
-from .verify import verify
-from .analyze import analyze
-from .collect import collect
+from .verify import verify_node
+from .analyze import analyze_node
+from .collect import collect_node

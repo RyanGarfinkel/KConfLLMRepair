@@ -1,54 +1,49 @@
-from singleton_decorator import singleton
-from langgraph.graph import END
-from src.config import settings
+from langchain_core.messages import HumanMessage
 from src.models import State
+from src.core import Kernel
 
-@singleton
 class VerifyNode:
 
-    def build_and_boot(self, state: State) -> dict:
+    def __init__(self, kernel: Kernel):
+        self.kernel = kernel
 
-        attempt_dir = f'{state.sample_dir}/attempt_{state.repair_attempts}'
-        build_log = f'{attempt_dir}/build.log'
+    def __call__(self, state: State) -> dict:
 
-        hypotheses = state.hypotheses.copy()
-        current_hypothesis = next((h for h in hypotheses if h.status == 'current'), None)
+        verify_attempts = state.get('verify_attempts', 0)
+        attempt_dir = f'{state.get('output_dir')}/attempt_{verify_attempts}'
 
-        if not state.kernel.build(state.latest_config, build_log):
-
-            if current_hypothesis:
-                current_hypothesis.status = 'failed'
-            
+        if not self.kernel.load_config(state.get('modified_config')):
             return {
-                'repair_attempts': state.repair_attempts + 1,
-                'latest_build': build_log,
-                'boot_succeeded': False,
-                'latest_boot': None,
-                'hypotheses': hypotheses,
+                'messages': [HumanMessage(content='ERROR: The modified configuration failed to load.')],
+                'verify_attempts': verify_attempts + 1,
+                'klocalizer_runs': 0,
+                'build_log': '',
+                'boot_log': '',
             }
-
-        boot_log = f'{attempt_dir}/boot.log'
-        boot_success = state.kernel.boot(boot_log)
-
-        if current_hypothesis:
-            current_hypothesis.status = 'success' if boot_success else 'failed'
-
+        
+        if not self.kernel.build(f'{attempt_dir}/build.log'):
+            return {
+                'messages': [HumanMessage(content='ERROR: Build failed.')],
+                'verify_attempts': verify_attempts + 1,
+                'klocalizer_runs': 0,
+                'build_log': f'{attempt_dir}/build.log',
+                'boot_log': '',
+            }
+        
+        if not self.kernel.boot(f'{attempt_dir}/boot.log'):
+            return {
+                'messages': [HumanMessage(content='ERROR: Boot failed.')],
+                'verify_attempts': verify_attempts + 1,
+                'klocalizer_runs': 0,
+                'build_log': f'{attempt_dir}/build.log',
+                'boot_log': f'{attempt_dir}/boot.log',
+            }
+        
         return {
-            'repair_attempts': state.repair_attempts + 1,
-            'boot_succeeded': boot_success,
-            'latest_build': build_log,
-            'latest_boot': boot_log,
-            'hypotheses': hypotheses,
+            'messages': [HumanMessage(content='SUCCESS: The kernel booted on QEMU!')],
+            'verify_attempts': verify_attempts + 1,
+            'klocalizer_runs': 0,
+            'verify_succeeded': True,
+            'build_log': f'{attempt_dir}/build.log',
+            'boot_log': f'{attempt_dir}/boot.log',
         }
-
-    def route(self, state: State) -> str:
-
-        if state.repair_attempts >= settings.agent.MAX_ITERATIONS:
-            return END
-        
-        if state.boot_succeeded:
-            return END
-        
-        return 'analyze'
-
-verify = VerifyNode()
