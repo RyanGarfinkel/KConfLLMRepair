@@ -11,7 +11,7 @@ class ToolAction(BaseModel):
 class VerifyAction(BaseModel):
 
     build_succeeded: bool = Field(..., frozen=True)
-    build_log: str = Field(..., frozen=True)
+    build_log: str | None = Field(..., frozen=True)
 
     boot_succeeded: bool = Field(..., frozen=True)
     boot_log: str | None = Field(..., frozen=True)
@@ -33,13 +33,14 @@ class Phase(BaseModel):
             response=response
         ))
 
-    def add_verify_action(self, build_succeeded: bool, build_log: str, boot_succeeded: bool, boot_log: str | None):
+    def add_verify_action(self, build_succeeded: bool, build_log: str | None, boot_succeeded: bool, boot_log: str | None):
         self.actions.append(VerifyAction(
             build_succeeded=build_succeeded,
             build_log=build_log,
             boot_succeeded=boot_succeeded,
             boot_log=boot_log
         ))
+
     def add_token_usage(self, input_tokens: int, output_tokens: int):
         self.token_usage = TokenUsage(
             input_tokens=self.token_usage.input_tokens + input_tokens,

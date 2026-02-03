@@ -6,6 +6,12 @@ class State(TypedDict):
 
     messages: Annotated[List[BaseMessage], add_messages]
 
+    hypothesis: str | None
+
     tool_calls: int
     klocalizer_runs: int
     verify_attempts: int
+
+    klocalizer_succeeded: bool
+    verify_succeeded: bool
+
