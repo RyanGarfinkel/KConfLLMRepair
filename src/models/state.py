@@ -19,8 +19,8 @@ class State(TypedDict):
     modified_config: str
     patch: str
 
-    build_log: str
-    boot_log: str
-    klocalizer_log: str
+    build_log: str | None
+    boot_log: str | None
+    klocalizer_log: str | None
 
     output_dir: str

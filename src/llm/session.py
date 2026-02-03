@@ -26,9 +26,6 @@ class Session(BaseModel):
             output_tokens=output,
             total_tokens=input + output
         )
-    
-    output_dir: str = Field(..., frozen=True)
-    attempt_dir: str = Field('attempt_0')
 
     @property
     def num_attempts(self) -> int:

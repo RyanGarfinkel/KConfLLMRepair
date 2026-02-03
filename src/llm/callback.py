@@ -24,7 +24,7 @@ class Callback(BaseCallbackHandler):
         messages = outputs.get('messages', [])
         
         if self.session.current_phase.name == 'verify':
-            self.handle_verify_end(messages[-1].content, outputs.get('verify_attempts', 1))
+            self.handle_verify_end(messages[-1].content, outputs.get('verify_attempts', 1), outputs.get('output_dir', ''))
             return
         
         ai_message = next((m for m in messages if isinstance(m, AIMessage)), None)
@@ -48,29 +48,29 @@ class Callback(BaseCallbackHandler):
                 response=response.content if response else ''
             )
 
-    def handle_verify_end(self, response: str, verify_attempts: int):
+    def handle_verify_end(self, response: str, verify_attempts: int, output_dir: str):
 
-        self.session.attempt_dir = f'{self.session.output_dir}/attempt_{verify_attempts - 1}'
+        attempt_dir = f'{output_dir}/attempt_{verify_attempts - 1}'
         if response.startswith('ERROR: Build'):
             self.session.current_phase.add_verify_action(
                 build_succeeded=False,
-                build_log=f'{self.session.attempt_dir}/build.log',
+                build_log=f'{attempt_dir}/build.log',
                 boot_succeeded=False,
                 boot_log=None
             )
         elif response.startswith('ERROR: Boot'):
             self.session.current_phase.add_verify_action(
                 build_succeeded=True,
-                build_log=f'{self.session.attempt_dir}/build.log',
+                build_log=f'{attempt_dir}/build.log',
                 boot_succeeded=False,
-                boot_log=f'{self.session.attempt_dir}/boot.log'
+                boot_log=f'{attempt_dir}/boot.log'
             )
         elif response.startswith('SUCCESS'):
             self.session.current_phase.add_verify_action(
                 build_succeeded=True,
-                build_log=f'{self.session.attempt_dir}/build.log',
+                build_log=f'{attempt_dir}/build.log',
                 boot_succeeded=True,
-                boot_log=f'{self.session.attempt_dir}/boot.log'
+                boot_log=f'{attempt_dir}/boot.log'
             )
         else:
             self.session.current_phase.add_verify_action(

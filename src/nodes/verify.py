@@ -1,6 +1,7 @@
 from langchain_core.messages import HumanMessage
 from src.models import State
 from src.core import Kernel
+import os
 
 class VerifyNode:
 
@@ -11,6 +12,7 @@ class VerifyNode:
 
         verify_attempts = state.get('verify_attempts', 0)
         attempt_dir = f'{state.get('output_dir')}/attempt_{verify_attempts}'
+        os.makedirs(attempt_dir, exist_ok=True)
 
         if not self.kernel.load_config(state.get('modified_config')):
             return {
