@@ -1,16 +1,13 @@
-from src.kernel import KernelRepo, KConfig
 from singleton_decorator import singleton
 from src.config import settings
-from src.utils import log
 import subprocess
-import os
 
 @singleton
 class KLocalizer:
 
-    def run(self, repo: KernelRepo, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+    def run(self, kernel_src: str, patch: str, log: str, define: list[str] = [], undefine: list[str] = []) -> bool:
 
-        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, repo.path, f'{sample_dir}/changes.patch', f'{sample_dir}/klocalizer.log']
+        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, patch, log]
 
         for opt in define:
             cmd.extend(['--define', opt])

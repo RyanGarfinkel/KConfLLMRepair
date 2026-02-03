@@ -28,7 +28,7 @@ class Worktree:
     
     def create(self, commit: str) -> str:
 
-        path = f'{settings.runtime.WORKTREE_DIR}/{commit[:10]}'
+        path = f'{settings.kernel.WORKTREEDIR}/{commit[:10]}'
 
         if os.path.exists(path):
             log.info(f'Worktree for commit {commit[:10]} already exists...')

@@ -6,9 +6,9 @@ import subprocess
 @singleton
 class Syzkaller:
 
-    def run(self, kernel_src: str, output: str) -> bool:
+    def run(self, kernel_src: str, base_path: str) -> bool:
 
-        cmd = ['bash', settings.scripts.SYZ_KCONF_SCRIPT, kernel_src, output, settings.syzkconf.INSTANCE]
+        cmd = ['bash', settings.scripts.SYZ_KCONF_SCRIPT, kernel_src, base_path, settings.kernel.SYZKCONF_INSTANCE]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
