@@ -1,6 +1,8 @@
-from src.models import Phase, TokenUsage
+from src.models import Phase, TokenUsage, State
 from pydantic import BaseModel, Field
 from typing import List, Literal
+from src.tools import diffconfig
+from src.config import settings
 
 class Session(BaseModel):
     
@@ -30,3 +32,31 @@ class Session(BaseModel):
     @property
     def num_attempts(self) -> int:
         return len([phase for phase in self.phases if phase.name == 'verify']) - 1
+
+    def model_dump(self, state: State) -> dict:
+
+        if state.get('verify_succeeded', False):
+            status = 'succeeded'
+        elif state.get('verify_attempts', 0) > settings.agent.MAX_VERIFY_ATTEMPTS:
+            status = 'failed'
+        elif state.get('tool_calls', 0) > settings.agent.MAX_TOOL_CALLS:
+            status = 'max-tool-calls-exceeded'
+        else:
+            status = 'in-progress'
+
+        if status == 'succeeded':
+            diff, edit_distance = diffconfig.compare(state.get('base_config'), state.get('modified_config'))
+        else:
+            diff = []
+            edit_distance = -1
+
+        return {
+            'summary': {
+                'status': status,
+                'num_attempts': self.num_attempts,
+                'edit_distance': edit_distance
+            },
+            'token_usage': self.token_usage.model_dump(),
+            'phases': [phase.model_dump() for phase in self.phases],
+            'edits': diff,
+        }

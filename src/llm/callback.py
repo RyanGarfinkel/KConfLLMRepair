@@ -1,6 +1,8 @@
-from langchain_core.messages import AIMessage, ToolMessage
+from langchain_core.messages import BaseMessage, AIMessage, ToolMessage, messages_to_dict
 from langchain_core.callbacks import BaseCallbackHandler
 from .session import Session
+from typing import List
+import json
 
 class Callback(BaseCallbackHandler):
 
@@ -22,9 +24,15 @@ class Callback(BaseCallbackHandler):
             return
             
         messages = outputs.get('messages', [])
-        
+        output = outputs.get('output', '')
+
+        message_file = f'{output}/messages.json'
+        summary_file = f'{output}/summary.json'
+
         if self.session.current_phase.name == 'verify':
             self.handle_verify_end(messages[-1].content, outputs.get('verify_attempts', 1), outputs.get('output_dir', ''))
+            self.log_messages(messages, message_file)
+            self.log_session(summary_file, outputs)
             return
         
         ai_message = next((m for m in messages if isinstance(m, AIMessage)), None)
@@ -47,6 +55,9 @@ class Callback(BaseCallbackHandler):
                 args=tool_call['args'],
                 response=response.content if response else ''
             )
+
+        self.log_messages(messages, message_file)
+        self.log_session(summary_file, state)
 
     def handle_verify_end(self, response: str, verify_attempts: int, output_dir: str):
 
@@ -80,3 +91,11 @@ class Callback(BaseCallbackHandler):
                 boot_log=None
             )
    
+    def log_session(self, file: str, state: dict):
+        with open(file, 'w') as f:
+            json.dump(self.session.model_dump(state), f, indent=4)
+ 
+    def log_messages(self, messages: List[BaseMessage], file: str):
+        with open(file, 'w') as f:
+            json.dump(messages_to_dict(messages), f, indent=4)
+                

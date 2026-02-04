@@ -8,6 +8,13 @@ class ToolAction(BaseModel):
     args: dict = Field(..., frozen=True)
     response: str = Field(..., frozen=True)
 
+    def model_dump(self):
+        return {
+            'name': self.name,
+            'args': self.args,
+            'response': self.response
+        }
+
 class VerifyAction(BaseModel):
 
     build_succeeded: bool = Field(..., frozen=True)
@@ -15,6 +22,14 @@ class VerifyAction(BaseModel):
 
     boot_succeeded: bool = Field(..., frozen=True)
     boot_log: str | None = Field(..., frozen=True)
+
+    def model_dump(self):
+        return {
+            'build_succeeded': self.build_succeeded,
+            'build_log': self.build_log,
+            'boot_succeeded': self.boot_succeeded,
+            'boot_log': self.boot_log
+        }
 
 class Phase(BaseModel):
 
@@ -47,3 +62,10 @@ class Phase(BaseModel):
             output_tokens=self.token_usage.output_tokens + output_tokens,
             total_tokens=self.token_usage.total_tokens + input_tokens + output_tokens
         )
+
+    def model_dump(self):
+        return {
+            'name': self.name,
+            'actions': [action.model_dump() for action in self.actions],
+            'token_usage': self.token_usage.model_dump()
+        }

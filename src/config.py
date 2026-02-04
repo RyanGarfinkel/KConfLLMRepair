@@ -9,6 +9,7 @@ class KernelSettings(BaseModel):
     KERNEL_SRC: str
     BZIMAGE: str = Field(default='arch/x86/boot/bzImage', frozen=True)
     SYZKCONF_INSTANCE: str = Field(default='upstream-apparmor-kasan', frozen=True)
+    DIFFCONFIG: str = Field(default='scripts/diffconfig', frozen=True)
 
     @property
     def WORKTREE_DIR(self) -> str:
@@ -27,6 +28,7 @@ class RuntimeSettings(BaseModel):
     MAX_THREADS: int = Field(default=1, ge=1)
     JOBS: int = Field(default=8, ge=1)
     CHUNK_WINDOW: int = 20
+    CLEANUP: bool = Field(default=False)
 
     SAMPLE_DIR: Optional[str] = Field(default=None)
 
@@ -42,7 +44,7 @@ class AgentSettings(BaseModel):
     GOOGLE_API_KEY: Optional[str] = Field(default=None)
     OPENAI_API_KEY: Optional[str] = Field(default=None)
     
-    MODEL: str = Field(default='gpt-5.2')
+    MODEL: str = Field(default='gemini-3-pro-preview')
     @property
     def PROVIDER(self) -> str:
         if self.MODEL.startswith('gemini'):
@@ -130,23 +132,3 @@ try:
 
 except Exception as e:
     raise RuntimeError(f'Failed to load configuration: {e}')
-
-def update_settings(**overrides) -> None:
-
-    global settings
-
-    try:
-
-        settings = Settings(**overrides)
-        log.info('Configuration updated successfully.')
-
-        if model := overrides.get('agent.MODEL'):
-            log.info(f'Using model: {model}')
-        
-        if provider := overrides.get('agent.PROVIDER'):
-            log.info(f'Using model from provider: {provider}')
-
-        if kernel_src := overrides.get('kernel.KERNEL_SRC'):
-            log.info(f'Kernel source path: {kernel_src}')
-    except Exception as e:
-        raise RuntimeError(f'Failed to update configuration: {e}')
