@@ -60,7 +60,7 @@ class KernelRepo:
 
             start = commits[-1]
 
-        patch = self.repo.git.log('-p', '--no-merges', f'{start.hexsha}..{end.hexsha}')
+        patch = self.repo.git.diff(f'{start.hexsha}..{end.hexsha}')
         patch_file = f'{output_dir}/changes.patch'
 
         if not patch:
@@ -157,11 +157,11 @@ class KernelRepo:
     @staticmethod
     def cleanup(path: str):
 
-        if path == settings.kernel.KERNEL_SRC:
-            log.info('Cannot clean up the main kernel source directory. Skipping cleanup.')
-            return
+        # if path == settings.kernel.KERNEL_SRC:
+        #     log.info('Cannot clean up the main kernel source directory. Skipping cleanup.')
+        #     return
         
-        # log.info('Cleaning up worktree.')
+        log.info('Cleaning up worktree.')
         
         # try:
 

@@ -123,7 +123,7 @@ class RAG:
     def __get_embedding_model(self):
 
         if settings.agent.PROVIDER == 'google':
-            return GoogleGenerativeAIEmbeddings(model='text-embedding-004', api_key=settings.agent.GOOGLE_API_KEY)
+            return GoogleGenerativeAIEmbeddings(model='gemini-embedding-001', api_key=settings.agent.GOOGLE_API_KEY)
         else:
             return OpenAIEmbeddings(api_key=settings.agent.OPENAI_API_KEY)
         

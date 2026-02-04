@@ -24,8 +24,8 @@ export WORKTREE_DIR=$ROOT/workspace/worktrees
 
 # Build Settings
 export CROSS_COMPILE=x86_64-linux-gnu-
-export DEBIAN_IMG=$ROOT/workspace/images/debian.raw
-export GOROOT=/usr/local/go
+export DEBIAN_IMG=$ROOT/workspace/images/bullseye.img            # $ROOT/workspace/images/debian.raw
+export GOROOT=$HOME/.local/go
 export ARCH=x86_64
 
 # Tool Settings
@@ -42,5 +42,13 @@ export MAIN_YML=$ROOT/workspace/tools/syzkaller/dashboard/config/linux/main.yml
 export CLASSPATH=$HOME/.local/share/superc/superc.jar:$HOME/.local/share/superc/xtc.jar:$HOME/.local/share/superc/JavaBDD/javabdd-1.0b2.jar:/usr/share/java/org.sat4j.core.jar:/usr/share/java/json.jar:$Z3_SRC/build/com.microsoft.z3.jar:$CLASSPATH
 export LD_LIBRARY_PATH=$Z3_SRC/build:$LD_LIBRARY_PATH
 export PATH=/usr/lib/ccache:$GOROOT/bin:$PATH
+export PATH=$HOME/.local/llvm/bin:$PATH
+
+export C_INCLUDE_PATH=$HOME/.local/include:$HOME/.local/include/elfutils
+export CPLUS_INCLUDE_PATH=$HOME/.local/include:$HOME/.local/include/elfutils
+export LIBRARY_PATH=$HOME/.local/lib
+export LD_LIBRARY_PATH=$HOME/.local/lib
+
+export CONFIG_CONSTRAINTS=$ROOT/workspace/tools/config_constraints.txt
 
 echo '[SUCCESS] Environment variables set successfully.'

@@ -19,7 +19,7 @@ class Executor:
             if tool.name == 'apply_and_test':
                 middleware.append(ToolCallLimitMiddleware(tool_name=tool.name, thread_limit=1))
             else:
-                middleware.append(ToolCallLimitMiddleware(tool_name=tool.name, thread_limit=24))
+                middleware.append(ToolCallLimitMiddleware(tool_name=tool.name, thread_limit=6))
 
         self.agent = create_agent(
             llm,
@@ -39,7 +39,7 @@ class Executor:
         output_tokens = 0
         total_tokens = 0
         for message in response.get('messages', []):
-            if isinstance(message, AIMessage):
+            if (isinstance(message, AIMessage)) or (isinstance(message, dict) and message.get("type") == "ai"):
 
                 if message.tool_calls:
                     tool_calls.extend(message.tool_calls)

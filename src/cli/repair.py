@@ -112,7 +112,7 @@ def main(base: str, modified: str, patch: str, output: str | None, kernel_src: s
         raise ValueError(f'Kernel source path {kernel_src} does not exist.')
 
     if jobs is not None:
-        settings.kernel.JOBS = jobs
+        settings.runtime.JOBS = jobs
 
     settings.agent.MAX_ITERATIONS = max_iterations
     
@@ -125,7 +125,8 @@ def main(base: str, modified: str, patch: str, output: str | None, kernel_src: s
         patch=os.path.abspath(patch),
         kernel_src=os.path.abspath(kernel_src),
         output=os.path.abspath(output) + '/agent-repair-attempts',
-        commit=None
+        start_commit=None,
+        end_commit=None,
     )
 
     repair(sample, model)

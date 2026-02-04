@@ -12,13 +12,14 @@ def repair_samples(n: int, model: str | None = None, max_iterations: int = 5, jo
 
         log.info(f'Repairing sample {i + 1}...')
 
-        kernel_src = KernelRepo.create_worktree(sample.commit)
+        kernel_src = f'workspace/worktrees/{sample.end_commit[:12]}' # KernelRepo.create_worktree(sample.end_commit)
+
         base = sample.base
         modified = sample.modified
         patch = sample.patch
 
         cmd = [
-            'python3', '-m', 'src.scripts.repair',
+            'python3', '-m', 'src.cli.repair',
             '--base', base,
             '--modified', modified,
             '--patch', patch,

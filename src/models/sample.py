@@ -11,7 +11,8 @@ class Sample:
     patch: str
     kernel_src: str
     output: str
-    commit: str | None
+    start_commit: str | None
+    end_commit: str | None
 
     @staticmethod
     def get_samples(n: int) -> list['Sample']:
@@ -35,7 +36,8 @@ class Sample:
             patch = f'{dir}/changes.patch'
             kernel_src = ''
             output = dir
-            commit = sample_data['end_commit']
+            start_commit = sample_data.get('start_commit', None)
+            end_commit = sample_data['end_commit']
 
             sample = Sample(
                 base=base,
@@ -43,7 +45,8 @@ class Sample:
                 patch=patch,
                 kernel_src=kernel_src,
                 output=output,
-                commit=commit
+                start_commit=start_commit,
+                end_commit=end_commit
             )
 
             samples.append(sample)

@@ -29,7 +29,7 @@ $SYZ_KCONF -config $MAIN_YML -instance $INSTANCE -sourcedir $KERNEL_SRC
 cp "$SYZKALLER_SRC/dashboard/config/linux/$INSTANCE.config" "$KERNEL_SRC/.config"
 
 cd "$KERNEL_SRC"
-make LLVM=1 olddefconfig > /dev/null
+make LLVM=1 olddefconfig ARCH=$ARCH > /dev/null
 cd "$ROOT"
 
 cp "$KERNEL_SRC/.config" "$OUTPUT"
