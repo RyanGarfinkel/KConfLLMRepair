@@ -6,6 +6,7 @@ from src.models import Sample
 from src.core import Kernel
 from random import randint
 from threading import Lock
+from typing import Callable
 import shutil
 import click
 import json
@@ -38,8 +39,8 @@ def sample_commits(n: int, since: str) -> tuple[dict, list[Sample]]:
             start_commit_date=worktree.main_repo.commit(all_commits[start + i * k + settings.runtime.COMMIT_WINDOW]).committed_datetime.isoformat(),
             end_commit=all_commits[start + i * k],
             end_commit_date=worktree.main_repo.commit(all_commits[start + i * k]).committed_datetime.isoformat(),
-            kernel_src='',  # Will be set when worktree is created
-            kernel_version='',  # Will be set when kernel is initialized
+            kernel_src='',
+            kernel_version='',
             base_builds=False,
             base_boots=False,
         ) for i in range(n)
@@ -75,14 +76,12 @@ def make_base(sample: Sample, kernel: Kernel) -> bool:
         return False
     else:
         sample.base_builds = True
-        log.success('Base configuration built successfully.')
     
     if not kernel.boot(f'{sample_dir}/boot.log'):
         log.error('Base configuration boot failed.')
         return False
     
     sample.base_boots = True
-    log.success('Base configuration booted successfully.')
 
     return True
 
@@ -93,7 +92,7 @@ def make_modified(sample: Sample, kernel: Kernel) -> bool:
     # Patch
     log.info('Generating patch for the sample...')
     
-    patch_path = f'{sample_dir}/change.patch'
+    patch_path = f'{sample_dir}/changes.patch'
     if not kernel.make_patch(sample.start_commit, sample.end_commit, patch_path):
         click.echo('Failed to generate patch for the sample.')
         return False
@@ -109,7 +108,6 @@ def make_modified(sample: Sample, kernel: Kernel) -> bool:
         return False
     
     if not kernel.run_klocalizer(sample.patch, f'{sample_dir}/klocalizer.log'):
-        log.error('KLocalizer failed to run.')
         return False
     
     if not os.path.exists(f'{kernel.src}/.config'):
@@ -150,7 +148,7 @@ def save_samples(params: dict, completed_samples: list[Sample]) :
             'samples': [s.model_dump() for s in completed_samples]
         }, f, indent=4)
 
-def generate_samples(n: int, since: str, complete_callback: callable[[int, Sample], None] | None = None) -> tuple[dict, list[Sample]]:
+def generate_samples(n: int, since: str, complete_callback: Callable[[int, Sample], None] | None = None) -> tuple[dict, list[Sample]]:
 
     sampling_params, samples = sample_commits(n, since)
     save_samples(sampling_params, [])

@@ -27,9 +27,9 @@ def repair_sample(i: int, sample: Sample):
     log.info(f'Starting repair for sample {i + 1}...')
 
     input = Input(
-        sample.base_config,
-        sample.modified_config,
-        sample.patch,
+        base_config=sample.base_config,
+        modified_config=sample.modified_config,
+        patch=sample.patch,
         output_dir=sample.sample_dir
     )
 

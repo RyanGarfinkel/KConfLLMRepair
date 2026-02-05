@@ -1,5 +1,5 @@
 from singleton_decorator import singleton
-from src.settings import settings
+from src.config import settings
 from src.utils import log
 import subprocess
 import os

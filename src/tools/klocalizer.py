@@ -9,6 +9,8 @@ class KLocalizer:
 
         cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, patch, log]
 
+        print('Running KLocalizer with command:', ' '.join(cmd))
+
         for opt in define:
             cmd.extend(['--define', opt])
             

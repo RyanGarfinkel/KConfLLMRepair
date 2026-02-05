@@ -13,8 +13,8 @@ def handler():
 
     log.info('Cleaning up active worktrees...')
     
-    for path in list(active_kernels.keys()):
-        worktree.cleanup(path)
+    # for path in list(active_kernels.keys()):
+    #     worktree.cleanup(path)
 
     log.info('Worktree cleanup complete.')
 
@@ -28,7 +28,7 @@ class Worktree:
     
     def create(self, commit: str) -> str:
 
-        path = f'{settings.kernel.WORKTREEDIR}/{commit[:10]}'
+        path = f'{settings.kernel.WORKTREE_DIR}/{commit[:10]}'
 
         if os.path.exists(path):
             log.info(f'Worktree for commit {commit[:10]} already exists...')

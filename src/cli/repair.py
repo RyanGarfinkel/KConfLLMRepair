@@ -2,13 +2,14 @@ from src.models import Input, State
 from src.core.kernel import Kernel
 from src.config import settings
 from src.llm import Session
+from typing import Callable
 from src.core import agent
 from src.utils import log
 import shutil
 import click
 import os
 
-def repair(input: Input, kernel_src: str, complete_callback: callable[[State, Session], None] | None = None):
+def repair(input: Input, kernel_src: str, complete_callback: Callable[[State, Session], None] | None = None):
 
     kernel = Kernel(kernel_src)
 

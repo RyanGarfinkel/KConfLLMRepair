@@ -71,7 +71,7 @@ class Kernel:
             return False
 
         if not klocalizer.run(self.src, patch, log_path, define, undefine):
-            log.error('KLocalizer failed.')
+            log.error('KLocalizer failed to run.')
             return False
         
         log.success('KLocalizer completed successfully.')

@@ -3,23 +3,33 @@ set -e
 
 ROOT=$(pwd)
 
+SKIP_DEPENDENCIES=false
+if [ "$1" = "skip" ]; then
+    SKIP_DEPENDENCIES=true
+fi
+
 # Dependency Installation
-echo '[INFO] Installing dependencies...'
+if [ "$SKIP_DEPENDENCIES" != "true" ]; then
 
-sudo apt-get update
-sudo apt-get install -y \
-     build-essential make gcc g++ \
-     flex bison bc \
-     libssl-dev libelf-dev libncurses-dev dwarves \
-     python3 python3-dev python3-pip pipx lz4 \
-     git wget unzip xz-utils lftp default-jdk \
-     openjdk-8-jdk libz3-java libjson-java sat4j \
-     qemu-system-x86 libdw-dev ccache \
-     clang-15 llvm-15 lld-15 \
-     gcc-x86-64-linux-gnu
+    echo '[INFO] Installing dependencies...'
 
-sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
-sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
+    sudo apt-get update
+    sudo apt-get install -y \
+        build-essential make gcc g++ \
+        flex bison bc \
+        libssl-dev libelf-dev libncurses-dev dwarves \
+        python3 python3-dev python3-pip pipx lz4 \
+        git wget unzip xz-utils lftp default-jdk \
+        openjdk-8-jdk libz3-java libjson-java sat4j \
+        qemu-system-x86 libdw-dev ccache \
+        clang-15 llvm-15 lld-15 \
+        gcc-x86-64-linux-gnu
+
+    sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
+    sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
+else
+    echo '[ERROR] Cannot install dependencies. This script may fail. To prevent this, please manually install the required dependencies.'
+fi
 
 # Workspace Setup
 echo '[INFO] Setting up the workspace directory...'
@@ -54,6 +64,40 @@ else
     echo '[INFO] Debian image already exists at workspace/images/debian.raw'
 fi
 
+# Clang Installation
+if ! command -v clang &> /dev/null; then
+    echo '[INFO] Installing Clang...'
+
+    wget https://github.com/llvm/llvm-project/releases/download/llvmorg-17.0.6/clang+llvm-17.0.6-x86_64-linux-gnu-ubuntu-22.04.tar.xz -O clang.tar.xz
+    tar -C ~/.local -xJf clang.tar.xz    
+    mv ~/.local/clang+llvm-17.0.6-x86_64-linux-gnu-ubuntu-22.04 ~/.local/llvm
+    rm clang.tar.xz
+
+    export PATH=$HOME/.local/llvm/bin:$PATH
+    echo '[SUCCESS] Clang installed successfully.'
+else
+    echo '[INFO] Clang is already installed.'
+fi
+
+# libdw-dev Installation
+if [ ! -f /usr/include/elfutils/libdw.h ] && [ ! -f "$HOME/.local/include/elfutils/libdw.h" ]; then
+    echo '[INFO] Installing libdw-dev...'
+
+    wget https://sourceware.org/elfutils/ftp/0.191/elfutils-0.191.tar.bz2 -O elfutils-0.191.tar.bz2
+    tar xf elfutils-0.191.tar.bz2
+    cd elfutils-0.191
+
+    ./configure --prefix=$HOME/.local --disable-debuginfod --disable-libdebuginfod
+    make -j$(nproc)
+    make install
+
+    cd $ROOT
+    rm -rf elfutils-0.191 elfutils-0.191.tar.bz2
+    echo '[SUCCESS] libdw-dev installed successfully.'
+else
+    echo '[INFO] libdw-dev is already installed.'
+fi
+
 # Go Installation
 if ! command -v go &> /dev/null; then
     echo '[INFO] Installing Go...'
@@ -62,7 +106,7 @@ if ! command -v go &> /dev/null; then
     GO_ARCH=amd64
 
     wget https://go.dev/dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz -O go.tar.gz
-    sudo tar -C /usr/local -xzf go.tar.gz
+    tar -C ~/.local -xzf go.tar.gz
     rm go.tar.gz
 
     echo '[SUCCESS] Go installed successfully.'
@@ -78,7 +122,7 @@ else
     echo '[INFO] Syzkaller already exists at workspace/tools/syzkaller'
 fi
 
-export GOROOT=/usr/local/go
+export GOROOT=$HOME/.local/go
 export PATH=$PATH:$GOROOT/bin
 
 cd workspace/tools/syzkaller

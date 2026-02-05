@@ -13,6 +13,8 @@ class Syzkaller:
         
         if result.returncode != 0:
             log.error(f'Syzkaller failed with exit code {result.returncode}')
+            if result.stdout:
+                log.error(f'Stdout: {result.stdout}')
             if result.stderr:
                 log.error(f'Stderr: {result.stderr}')
 
