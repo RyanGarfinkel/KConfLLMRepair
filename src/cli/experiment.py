@@ -44,7 +44,7 @@ def run_experiment(n: int, since: str, skip_generation: bool, skip_repair: bool)
     log.info(f'Starting experiment with {n} samples...')
 
     if skip_generation and not skip_repair:
-        log.info('Reading existing samples from disk...')
+        log.info('Reading existing samples from sample folder...')
         samples = read_samples(n)
         repair_all(samples)
     elif not skip_generation:

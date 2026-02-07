@@ -17,6 +17,8 @@ class Session(BaseModel):
     def start_phase(self, name: Literal['verify', 'analyze', 'collect']):
         phase = Phase(name=name)
         self.phases.append(phase)
+
+    initial_modified_config: str = Field(..., frozen=True)
     
     @property
     def token_usage(self) -> TokenUsage:
@@ -45,7 +47,7 @@ class Session(BaseModel):
             status = 'in-progress'
 
         if status == 'succeeded':
-            diff, edit_distance = diffconfig.compare(state.get('base_config'), state.get('modified_config'))
+            diff, edit_distance = diffconfig.compare(self.initial_modified_config, state.get('modified_config'))
         else:
             diff = []
             edit_distance = -1

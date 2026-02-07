@@ -21,6 +21,8 @@ class VerifyNode:
                 'klocalizer_runs': 0,
                 'build_log': '',
                 'boot_log': '',
+                'output_dir': state.get('output_dir'),
+                'modified_config': state.get('modified_config'),
             }
         
         if not self.kernel.build(f'{attempt_dir}/build.log'):
@@ -30,6 +32,8 @@ class VerifyNode:
                 'klocalizer_runs': 0,
                 'build_log': f'{attempt_dir}/build.log',
                 'boot_log': '',
+                'output_dir': state.get('output_dir'),
+                'modified_config': state.get('modified_config'),
             }
         
         if not self.kernel.boot(f'{attempt_dir}/boot.log'):
@@ -39,6 +43,8 @@ class VerifyNode:
                 'klocalizer_runs': 0,
                 'build_log': f'{attempt_dir}/build.log',
                 'boot_log': f'{attempt_dir}/boot.log',
+                'output_dir': state.get('output_dir'),
+                'modified_config': state.get('modified_config'),
             }
         
         return {
@@ -48,4 +54,6 @@ class VerifyNode:
             'verify_succeeded': True,
             'build_log': f'{attempt_dir}/build.log',
             'boot_log': f'{attempt_dir}/boot.log',
+            'output_dir': state.get('output_dir'),
+            'modified_config': state.get('modified_config'),
         }

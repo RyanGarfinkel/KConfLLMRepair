@@ -46,7 +46,7 @@ def main(base: str, modified: str, patch: str, output: str | None, kernel_src: s
         output_dir=output
     )
 
-    settings.kernel.JOBS = jobs
+    settings.runtime.JOBS = jobs
     settings.agent.MODEL = model
     # MAX_VERIFY_ATTEMPTS
     # MAX_KLOCALIZER_RUNS

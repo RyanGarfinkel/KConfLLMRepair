@@ -166,12 +166,15 @@ def generate_samples(n: int, since: str, complete_callback: Callable[[int, Sampl
             **{**sample.model_dump(), 'kernel_src': kernel_src, 'kernel_version': kernel.version}
         )
 
+        with lock:
+            completed.append(sample)
+            save_samples(sampling_params, completed)
+
         if not make_sample(sample, kernel):
             log.error(f'Failed to create sample {i + 1}.')
             return
         
         with lock:
-            completed.append(sample)
             save_samples(sampling_params, completed)
             
         if complete_callback is not None:

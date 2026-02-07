@@ -17,8 +17,15 @@ class KLocalizer:
         for opt in undefine:
             cmd.extend(['--undefine', opt])
 
-        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run(cmd, capture_output=True)
 
+        if result.returncode != 0:
+            if result.stdout:
+                print('KLocalizer output:\n', result.stdout)
+            
+            if result.stderr:
+                print('KLocalizer error output:\n', result.stderr)
+        
         return result.returncode == 0
 
 klocalizer = KLocalizer()

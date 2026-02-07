@@ -1,7 +1,8 @@
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage, messages_to_dict
 from langchain_core.callbacks import BaseCallbackHandler
+from src.models import State
 from .session import Session
-from typing import List
+from typing import List, cast
 import json
 
 class Callback(BaseCallbackHandler):
@@ -10,27 +11,27 @@ class Callback(BaseCallbackHandler):
         self.session = session
 
     def on_chain_start(self, serialized, inputs, **kwargs):
-        tags = kwargs.get('tags', [])
+        node = kwargs.get('name', '')
         
-        if 'verify' in tags:
+        if node == 'verify':
             self.session.start_phase('verify')
-        elif 'analyze' in tags:
+        elif node == 'analyze':
             self.session.start_phase('analyze')
-        elif 'collect' in tags:
+        elif node == 'collect':
             self.session.start_phase('collect')
     
     def on_chain_end(self, outputs, **kwargs):
-        if not self.session.current_phase:
+        if not self.session.current_phase or not any(t.startswith('graph:step') for t in kwargs.get('tags', [])):
             return
-            
-        messages = outputs.get('messages', [])
-        output = outputs.get('output', '')
 
-        message_file = f'{output}/messages.json'
-        summary_file = f'{output}/summary.json'
+        messages = outputs.get('messages', [])
+        output_dir = outputs.get('output_dir', '')
+
+        message_file = f'{output_dir}/messages.json'
+        summary_file = f'{output_dir}/summary.json'
 
         if self.session.current_phase.name == 'verify':
-            self.handle_verify_end(messages[-1].content, outputs.get('verify_attempts', 1), outputs.get('output_dir', ''))
+            self.handle_verify_end(messages[-1].content, outputs.get('verify_attempts', 1), output_dir)
             self.log_messages(messages, message_file)
             self.log_session(summary_file, outputs)
             return
@@ -57,7 +58,7 @@ class Callback(BaseCallbackHandler):
             )
 
         self.log_messages(messages, message_file)
-        self.log_session(summary_file, state)
+        self.log_session(summary_file, outputs)
 
     def handle_verify_end(self, response: str, verify_attempts: int, output_dir: str):
 
@@ -93,7 +94,7 @@ class Callback(BaseCallbackHandler):
    
     def log_session(self, file: str, state: dict):
         with open(file, 'w') as f:
-            json.dump(self.session.model_dump(state), f, indent=4)
+            json.dump(self.session.model_dump(cast(State, state)), f, indent=4)
  
     def log_messages(self, messages: List[BaseMessage], file: str):
         with open(file, 'w') as f:

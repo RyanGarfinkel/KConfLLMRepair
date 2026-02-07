@@ -57,6 +57,7 @@ class AgentSettings(BaseModel):
     MAX_KLOCALIZER_RUNS: int = Field(default=3, frozen=True)
     MAX_VERIFY_ATTEMPTS: int = Field(default=5, frozen=True)
     MAX_TOOL_CALLS: int = Field(default=20, frozen=True)
+    MESSAGE_LENGTH: int = Field(default=20, frozen=True)
 
     @model_validator(mode='after')
     def verify_api_key(self):

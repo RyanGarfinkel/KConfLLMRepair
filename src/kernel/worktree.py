@@ -37,6 +37,11 @@ class Worktree:
         log.info(f'Creating worktree for commit {commit[:10]}...')
         self.main_repo.git.worktree('add', '-f', path, commit)
         log.success('Worktree created successfully.')
+        
+        log.info('Ensuring worktree is checked out at end commit...')
+        tmp_repo = Repo(path)
+        tmp_repo.git.checkout(commit, force=True)
+        log.info('Worktree checkout complete.')
 
         active_kernels[path] = True
 

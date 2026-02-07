@@ -8,25 +8,25 @@ from .kernel import Kernel
 
 @singleton
 class Agent:
-    
-    def __init__(self):
-        self.workflow = StateGraph(State)
-        self.llm = model.get()
 
     def repair(self, input: Input, kernel: Kernel) -> tuple[dict, Session]:
+
+        llm = model.get()
+        workflow = StateGraph(State)
+
         # Nodes
-        self.workflow.add_node('verify', VerifyNode(kernel), tags=['verify'])
-        self.workflow.add_node('analyze', AnalyzeNode(self.llm), tags=['analyze'])
-        self.workflow.add_node('collect', CollectNode(self.llm, kernel), tags=['collect'])
+        workflow.add_node('verify', VerifyNode(kernel), tags=['verify'])
+        workflow.add_node('analyze', AnalyzeNode(llm), tags=['analyze'])
+        workflow.add_node('collect', CollectNode(llm, kernel), tags=['collect'])
 
         # Edges
-        self.workflow.add_edge(START, 'verify')
-        self.workflow.add_conditional_edges('verify', verify_router)
-        self.workflow.add_conditional_edges('analyze', analyze_router)
-        self.workflow.add_conditional_edges('collect', collect_router)
+        workflow.add_edge(START, 'verify')
+        workflow.add_conditional_edges('verify', verify_router)
+        workflow.add_conditional_edges('analyze', analyze_router)
+        workflow.add_conditional_edges('collect', collect_router)
 
         # Compile
-        agent = self.workflow.compile()
+        agent = workflow.compile()
 
         # State & Callback
         initial_state = State(
@@ -46,7 +46,7 @@ class Agent:
             output_dir=input.output_dir
         )
 
-        session = Session()
+        session = Session(initial_modified_config=input.modified_config)
         callback = Callback(session)
         
         # Run

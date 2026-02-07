@@ -4,7 +4,7 @@ set -e
 WORKING_DIR=$(pwd)
 
 # Input
-KERNEL_SRC=$1
+KERNEL=$1
 PATCH_FILE=$2
 LOG_FILE=$3
 EXTRA_ARGS=("${@:4}")
@@ -25,12 +25,14 @@ if [ ! -f "$PATCH_FILE" ]; then
 fi
 
 # Running KLocalizer
-cd $KERNEL_SRC
+cd $KERNEL
 rm -f "$LOG_FILE"
 
+echo "[INFO] Running KLocalizer on kernel source at $KERNEL with patch $PATCH_FILE."
+
 LLVM=1 CC="clang -fintegrated-as" LD=ld.lld \
-        klocalizer -a x86_64 \
-        --repair "$KERNEL_SRC/.config" \
+        klocalizer -a $ARCH \
+        --repair "$KERNEL/.config" \
         --include-mutex $PATCH_FILE \
         "${EXTRA_ARGS[@]}" > "$LOG_FILE" 2>&1 || \
     { cd "$WORKING_DIR"; exit 1; }

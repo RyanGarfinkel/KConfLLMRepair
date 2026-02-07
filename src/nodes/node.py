@@ -34,7 +34,7 @@ class Node(ABC):
 
         # Agent Setup
         agent = self.llm.bind_tools(self.tools(state))
-        prompt = [self.system_message, self.state_message] + state.get('messages')[-settings.agent.MAX_CONTENT_MESSAGES:]
+        prompt = [self.system_message, self.state_message] + state.get('messages')[-settings.agent.MESSAGE_LENGTH:]
 
         # Agent Execution & Response Handling
         response = agent.invoke(prompt)
