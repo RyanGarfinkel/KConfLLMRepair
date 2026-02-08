@@ -58,10 +58,18 @@ class CollectNode(Node):
             name = call['name']
             args = call.get('args', {})
 
+            if name not in tool_map:
+                new_messages.append(ToolMessage(
+                    tool_call_id=call['id'],
+                    name=name,
+                    content=f'ERROR: Tool {name} not found. This call is skipped.'
+                ))
+                continue
+
             new_messages.append(ToolMessage(
                 tool_call_id=call['id'],
                 name=name,
-                content=tool_map[name](**args)
+                content=tool_map[name].invoke(args)
             ))
 
             tool_count += 1
@@ -96,7 +104,7 @@ class CollectNode(Node):
                 new_messages.append(ToolMessage(
                     tool_call_id=call['id'],
                     name=name,
-                    content=tool_map[name](**args)
+                    content=tool_map[name].invoke(args)
                 ))
 
                 attempts = 0
@@ -138,5 +146,6 @@ class CollectNode(Node):
             'klocalizer_runs': klocalizer_runs,
             'klocalizer_succeeded': klocalizer_succeeded,
             'modified_config': modified_config,
-            'klocalizer_log': klocalizer_log
+            'klocalizer_log': klocalizer_log,
+            'output_dir': state.get('output_dir'),
         }

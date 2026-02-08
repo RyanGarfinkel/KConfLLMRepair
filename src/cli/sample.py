@@ -2,11 +2,11 @@ from src.utils import log, dispatcher
 from src.config import settings
 from src.kernel import worktree
 from src.tools import syzkaller
+from src.utils import file_lock
 from src.models import Sample
+from typing import Callable
 from src.core import Kernel
 from random import randint
-from threading import Lock
-from typing import Callable
 import shutil
 import click
 import json
@@ -15,8 +15,8 @@ import os
 main_repo = worktree.main_repo
 
 def sample_commits(n: int, since: str) -> tuple[dict, list[Sample]]:
-
-    all_commits = main_repo.git.rev_list('HEAD', f'--since={since}', '--no-merges').splitlines()
+    
+    all_commits = list(main_repo.iter_commits('HEAD', since=since, no_merges=True))
     total_commits = len(all_commits) - settings.runtime.COMMIT_WINDOW
     k = total_commits // n
 
@@ -24,8 +24,8 @@ def sample_commits(n: int, since: str) -> tuple[dict, list[Sample]]:
 
     sampling_params = {
         'total_commits': len(all_commits),
-        'earliest_commit': worktree.main_repo.commit(all_commits[-1]).authored_datetime.isoformat(),
-        'latest_commit': worktree.main_repo.commit(all_commits[0]).authored_datetime.isoformat(),
+        'earliest_commit': all_commits[-1].committed_datetime.isoformat(),
+        'latest_commit': all_commits[0].committed_datetime.isoformat(),
         'commit_window': settings.runtime.COMMIT_WINDOW,
         'k': k,
         'n': n,
@@ -35,10 +35,10 @@ def sample_commits(n: int, since: str) -> tuple[dict, list[Sample]]:
     commits = [
         Sample(
             sample_dir=settings.runtime.SAMPLE_DIR + f'/sample_{i}',
-            start_commit=all_commits[start + i * k + settings.runtime.COMMIT_WINDOW],
-            start_commit_date=worktree.main_repo.commit(all_commits[start + i * k + settings.runtime.COMMIT_WINDOW]).committed_datetime.isoformat(),
-            end_commit=all_commits[start + i * k],
-            end_commit_date=worktree.main_repo.commit(all_commits[start + i * k]).committed_datetime.isoformat(),
+            start_commit=all_commits[start + i * k + settings.runtime.COMMIT_WINDOW].hexsha,
+            start_commit_date=all_commits[start + i * k + settings.runtime.COMMIT_WINDOW].committed_datetime.isoformat(),
+            end_commit=all_commits[start + i * k].hexsha,   
+            end_commit_date=all_commits[start + i * k].committed_datetime.isoformat(),
             kernel_src='',
             kernel_version='',
             base_builds=False,
@@ -153,7 +153,6 @@ def generate_samples(n: int, since: str, complete_callback: Callable[[int, Sampl
     sampling_params, samples = sample_commits(n, since)
     save_samples(sampling_params, [])
 
-    lock = Lock()
     completed = []
 
     def process(i: int):
@@ -166,7 +165,7 @@ def generate_samples(n: int, since: str, complete_callback: Callable[[int, Sampl
             **{**sample.model_dump(), 'kernel_src': kernel_src, 'kernel_version': kernel.version}
         )
 
-        with lock:
+        with file_lock:
             completed.append(sample)
             save_samples(sampling_params, completed)
 
@@ -174,7 +173,7 @@ def generate_samples(n: int, since: str, complete_callback: Callable[[int, Sampl
             log.error(f'Failed to create sample {i + 1}.')
             return
         
-        with lock:
+        with file_lock:
             save_samples(sampling_params, completed)
             
         if complete_callback is not None:

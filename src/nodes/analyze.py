@@ -20,7 +20,9 @@ class AnalyzeNode(Node):
                 able to analyze the klocalizer log, build log, and QEMU boot log using the provided tools to gather evidence to form your
                 hypothesis. Once you have formed a hypothesis, you will express it using the express_hypothesis tool. It is encouraged that
                 you first gather sufficient evidence before expressing your hypothesis to ensure its accuracy. Do not call the express_hypothesis
-                tool until you have queried the logs. Only call the express_hypothesis tool once per analyze phase.                                           
+                tool until you have queried the logs. Only call the express_hypothesis tool once per analyze phase. The klocalizer log does not exist
+                on the first analyze phase since klocalizer has not been run yet, so focus on analyzing the build and boot logs for the first hypothesis.
+                After the first time klocalizer runs, you will have access to see it.
             """)
     
     def tools(self, state: State):
@@ -45,10 +47,18 @@ class AnalyzeNode(Node):
             name = tool['name']
             args = tool.get('args', {})
 
+            if name not in tool_map:
+                new_messages.append(ToolMessage(
+                    tool_call_id=tool['id'],
+                    name=name,
+                    content=f'ERROR: Tool {name} not found. This call is skipped.'
+                ))
+                continue
+
             new_messages.append(ToolMessage(
                 tool_call_id=tool['id'],
                 name=name,
-                content=tool_map[name](**args)
+                content=tool_map[name].invoke(args)
             ))
 
             if name == 'express_hypothesis':
@@ -64,4 +74,5 @@ class AnalyzeNode(Node):
             'klocalizer_runs': 0,
             'verify_succeeded': False,
             'klocalizer_succeeded': False,
+            'output_dir': state.get('output_dir')
         }

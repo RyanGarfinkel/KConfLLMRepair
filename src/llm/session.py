@@ -39,9 +39,9 @@ class Session(BaseModel):
 
         if state.get('verify_succeeded', False):
             status = 'succeeded'
-        elif state.get('verify_attempts', 0) > settings.agent.MAX_VERIFY_ATTEMPTS:
+        elif state.get('verify_attempts', 0) >= settings.agent.MAX_VERIFY_ATTEMPTS:
             status = 'failed'
-        elif state.get('tool_calls', 0) > settings.agent.MAX_TOOL_CALLS:
+        elif state.get('tool_calls', 0) >= settings.agent.MAX_TOOL_CALLS:
             status = 'max-tool-calls-exceeded'
         else:
             status = 'in-progress'
@@ -56,7 +56,8 @@ class Session(BaseModel):
             'summary': {
                 'status': status,
                 'num_attempts': self.num_attempts,
-                'edit_distance': edit_distance
+                'edit_distance': edit_distance,
+                'tool_calls': state.get('tool_calls', 0),
             },
             'token_usage': self.token_usage.model_dump(),
             'phases': [phase.model_dump() for phase in self.phases],

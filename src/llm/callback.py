@@ -1,9 +1,11 @@
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage, messages_to_dict
 from langchain_core.callbacks import BaseCallbackHandler
+from src.utils import file_lock
+from typing import List, cast
 from src.models import State
 from .session import Session
-from typing import List, cast
 import json
+import os
 
 class Callback(BaseCallbackHandler):
 
@@ -12,12 +14,13 @@ class Callback(BaseCallbackHandler):
 
     def on_chain_start(self, serialized, inputs, **kwargs):
         node = kwargs.get('name', '')
+        current = self.session.current_phase.name if self.session.current_phase else 'None'
         
-        if node == 'verify':
+        if node == 'verify' and current != 'verify':
             self.session.start_phase('verify')
-        elif node == 'analyze':
+        elif node == 'analyze' and current != 'analyze':
             self.session.start_phase('analyze')
-        elif node == 'collect':
+        elif node == 'collect' and current != 'collect':
             self.session.start_phase('collect')
     
     def on_chain_end(self, outputs, **kwargs):
@@ -45,7 +48,7 @@ class Callback(BaseCallbackHandler):
         # Record Token Usage
         usage = ai_message.usage_metadata
         if usage is not None:
-            self.session.current_phase.add_token_usage(usage.input_tokens, usage.output_tokens)
+            self.session.current_phase.add_token_usage(usage.get('input_tokens', 0), usage.get('output_tokens', 0))
 
         # Match Tool Calls
         map = { msg.tool_call_id: msg for msg in tool_messages }
@@ -93,10 +96,11 @@ class Callback(BaseCallbackHandler):
             )
    
     def log_session(self, file: str, state: dict):
-        with open(file, 'w') as f:
-            json.dump(self.session.model_dump(cast(State, state)), f, indent=4)
- 
+        with file_lock:
+            with open(file, 'w') as f:
+                json.dump(self.session.model_dump(cast(State, state)), f, indent=4)
+
     def log_messages(self, messages: List[BaseMessage], file: str):
-        with open(file, 'w') as f:
-            json.dump(messages_to_dict(messages), f, indent=4)
-                
+        with file_lock:
+            with open(file, 'w') as f:
+                json.dump(messages_to_dict(messages), f, indent=4)
