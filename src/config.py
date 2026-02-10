@@ -13,6 +13,7 @@ class KernelSettings(BaseModel):
     KERNEL_SRC: str
     SUPERC_PATH: str
     BZIMAGE: str = 'arch/x86/boot/bzImage'
+    DIFFCONFIG: str = Field(default='scripts/diffconfig', frozen=True)
 
     @field_validator('KERNEL_SRC', 'SUPERC_PATH')
     def validate_kernel_exists(cls, v: str, info: ValidationInfo) -> str:
