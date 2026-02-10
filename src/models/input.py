@@ -4,12 +4,10 @@ import os
 
 class Input(BaseModel):
 
-    base_config: str = Field(..., frozen=True)
-    modified_config: str = Field(..., frozen=True)
-    patch: str | None = Field(..., frozen=True)
+    config: str = Field(..., frozen=True)
     output_dir: str | None = Field(default=None, frozen=True)
 
-    @field_validator('base_config', 'modified_config', 'patch')
+    @field_validator('config')
     @classmethod
     def validate_file_exists(cls, v: str | None) -> str | None:
         if v is not None and not os.path.exists(v):

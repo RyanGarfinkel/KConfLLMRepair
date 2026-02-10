@@ -24,7 +24,7 @@ export WORKTREE_DIR=$ROOT/workspace/worktrees
 
 # Build Settings
 export CROSS_COMPILE=x86_64-linux-gnu-
-export DEBIAN_IMG=$ROOT/workspace/images/bullseye.img            # $ROOT/workspace/images/debian.raw
+export DEBIAN_IMG=$ROOT/workspace/images/debian.raw #$ROOT/workspace/images/bullseye.img 
 export GOROOT=$HOME/.local/go
 export ARCH=x86_64
 
