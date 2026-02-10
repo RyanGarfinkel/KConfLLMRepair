@@ -1,4 +1,5 @@
-from langchain.messages import SystemMessage
+from langchain.messages import SystemMessage, HumanMessage
+from langchain_core.messages.base import BaseMessage
 from singleton_decorator import singleton
 from src.config import settings
 from src.models import Attempt
@@ -45,13 +46,13 @@ class Prompt:
             - You should make use of the search tools to gather as much information as possible before making changes.
         """)
     
-    def prompt(self, session: Session) -> list[SystemMessage]:
+    def prompt(self, session: Session) -> list[BaseMessage]:
         if session.patch:
             return [self.system_mutex, self.user(session)]
         else:
             return [self.system_config, self.user(session)]
         
-    def user(self, session: Session) -> SystemMessage:
+    def user(self, session: Session) -> HumanMessage:
 
         content = ''
 
@@ -75,14 +76,14 @@ class Prompt:
         """
 
         if len(session.attempts) == 1:
-            return SystemMessage(content=content)
+            return HumanMessage(content=content)
         
         content += 'HISTORY:\n'
 
         for i, attempt in enumerate(session.attempts):
             content += self.__format_attempt(i + 1, attempt)
 
-        return SystemMessage(content=content)
+        return HumanMessage(content=content)
 
     def __format_attempt(self, i: int, attempt: Attempt) -> str:
         return f"""

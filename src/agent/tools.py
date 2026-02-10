@@ -1,4 +1,5 @@
 from langchain_core.tools import StructuredTool, tool
+from .session import Session
 from .rag import RAG
 import os
 
@@ -28,7 +29,7 @@ def search_config(path: str, options: list[str]) -> str:
 
     return '\n'.join(results)
 
-def get_agent_tools(base: str | None, patch: str | None, modified: str, build: str, boot: str) -> list[StructuredTool]:
+def get_agent_tools(session: Session) -> list[StructuredTool]:
 
     @tool
     def search_base_config(options: list[str]) -> str:
@@ -40,7 +41,7 @@ def get_agent_tools(base: str | None, patch: str | None, modified: str, build: s
         Returns:
             str: A string containing the values of the options searched for that were found in the base config file.
         """
-        return search_config(base, options)
+        return search_config(session.base, options)
     
     @tool
     def search_latest_config(options: list[str]) -> str:
@@ -52,10 +53,10 @@ def get_agent_tools(base: str | None, patch: str | None, modified: str, build: s
         Returns:
             str: A string containing the values of the options searched for that were found in the latest modified config file.
         """
-        return search_config(modified, options)
+        return search_config(session.attempts[-1].config, options)
     
-    build_rag = RAG(path=build, type='build')
-    boot_rag = RAG(path=boot, type='qemu')
+    build_rag = RAG(path=session.attempts[-1].build_log, type='build')
+    boot_rag = RAG(path=session.attempts[-1].boot_log, type='qemu')
 
     tools = [
         search_latest_config,
@@ -69,11 +70,11 @@ def get_agent_tools(base: str | None, patch: str | None, modified: str, build: s
         )
     ]
 
-    if base:
+    if session.base:
         tools.insert(0, search_base_config)
 
-    if patch:
-        patch_rag = RAG(path=patch, type='patch')
+    if session.patch:
+        patch_rag = RAG(path=session.patch, type='patch')
         tools.append(
             patch_rag.as_tool(
                 name='search_patch',

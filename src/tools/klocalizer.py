@@ -1,21 +1,32 @@
 from singleton_decorator import singleton
-from src.kernel import KernelRepo
 from src.config import settings
 import subprocess
+import shutil
 import os
 
 @singleton
 class KLocalizer:
 
-    def run(self, repo: KernelRepo, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+    def run(self, kernel_src: str, patch: str | None, log: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+        
+        if not patch:
+            print('correct place')
+            with open(f'{kernel_src}/constraints.txt', 'w') as f:
+                for option in define:
+                    f.write(option + '\n')
 
-        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, repo.path, f'{sample_dir}/changes.patch', f'{sample_dir}/klocalizer.log']
-
-        for opt in define:
-            cmd.extend(['--define', opt])
+                for option in undefine:
+                    f.write(f'!{option}\n')
             
-        for opt in undefine:
-            cmd.extend(['--undefine', opt])
+            cmd = ['bash', settings.scripts.RUN_KLOCALIZER_CONSTRAINTS_SCRIPT, kernel_src, f'{kernel_src}/constraints.txt', log]
+        else:
+            cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, patch, log]
+
+            for opt in define:
+                cmd.extend(['--define', opt])
+                
+            for opt in undefine:
+                cmd.extend(['--undefine', opt])
 
         result = subprocess.run(cmd, capture_output=True)
 

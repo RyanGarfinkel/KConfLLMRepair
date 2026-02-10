@@ -1,49 +1,16 @@
 from src.config import settings
 from src.utils import log
 from git import Repo
-import shutil
-import atexit
-import re
 import os
-
-active_kernels = {}
-def handler():
-
-    global active_kernels
-    
-    for path in list(active_kernels.keys()):
-        KernelRepo.cleanup(path)
-
-atexit.register(handler)
 
 class KernelRepo:
 
-    __main_repo: Repo = Repo(settings.kernel.KERNEL_SRC)
+    main_repo: Repo = Repo(settings.kernel.KERNEL_SRC)
 
     def __init__(self, kernel_src: str):
 
         self.repo = Repo(kernel_src)
         self.path = kernel_src
-
-    def get_kernel_version(self) -> str:
-
-        version = ''
-        patchlevel = ''
-        sublevel = ''
-        extraversion = ''
-
-        with open(f'{self.path}/Makefile', 'r') as f:
-            for line in f:
-                if line.startswith('VERSION'):
-                    version = line.split('=')[1].strip()
-                elif line.startswith('PATCHLEVEL'):
-                    patchlevel = line.split('=')[1].strip()
-                elif line.startswith('SUBLEVEL'):
-                    sublevel = line.split('=')[1].strip()
-                elif line.startswith('EXTRAVERSION'):
-                    extraversion = line.split('=')[1].strip()
-
-        return f'{version}.{patchlevel}.{sublevel}{extraversion}'
 
     def make_patch(self, output_dir: str, start_commit: str | None = None) -> tuple[bool, str | None]:
 
@@ -72,85 +39,18 @@ class KernelRepo:
 
         return True, start.hexsha
 
-    def get_option_mapping(self) -> dict[str, list[str]]:
-
-        map = {}
-
-        for path, dirs, files in os.walk(f'{self.path}'):
-
-            if 'Kconfig' not in files:
-                continue
-
-            with open(f'{path}/Kconfig', 'r') as f:
-                subgroup = os.path.basename(path)
-                options = []
-                for line in f:
-                    match = re.search(r'config (\w+)', line)
-                    if match:
-                        options.append(match.group(1))
-
-                if options:
-                    map[subgroup] = options
-
-        return map
-
-    def __parse_kconfig(path: str) -> dict[str, list[str]]:
-
-        map = {}
-        menu = 'placeholder'
-
-        with open(path, 'r') as f:
-            for line in f:
-                line = line.strip()
-
-                if line.startswith('menu '):
-                    menu = line.split('menu ')[1].strip().strip('"')
-                elif line.startswith('config '):
-                    option = line.split('config ')[1].strip()
-                    if menu not in map:
-                        map[menu] = []
-                    map[menu].append(option)
-                elif line.startswith('endmenu'):
-                    menu = 'placeholder'
-
-        return map
-
-    @staticmethod
-    def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
-        
-        repo = KernelRepo.__main_repo
-
-        if start_commit:
-            end = repo.commit(start_commit)
-        else:
-            end = repo.head.commit
-
-        commits = [end.hexsha]
-
-        for _ in range(n - 1):
-
-            start = list(repo.iter_commits(end, max_count=settings.runtime.COMMIT_WINDOW, no_merges=True))[-1]
-            start = start.parents[0]
-
-            commits.append(start.hexsha)
-            end = start
-
-        return commits
-    
     @staticmethod
     def create_worktree(commit: str) -> str:
 
-        path = f'{settings.runtime.WORKTREE_DIR}/{commit[:12]}'
+        path = f'{settings.kernel.WORKTREE_DIR}/{commit[:12]}'
         if os.path.exists(path):
-            log.info('Worktree already exists. Cleaning up before creating a new one.')
-            KernelRepo.cleanup(path)
+            return path
 
         log.info('Creating worktree.')
 
-        KernelRepo.__main_repo.git.worktree('add', '-f', path, commit)
+        KernelRepo.main_repo.git.worktree('add', '-f', path, commit)
 
         log.success('Worktree created successfully.')
-        active_kernels[path] = True
 
         return path
     

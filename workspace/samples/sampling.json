@@ -1,0 +1,14 @@
+{
+    "summary": {
+        "kernel_version": "6.19.0-rc5",
+        "end_commit": "615aad0f61e0c7a898184a394dc895c610100d4f",
+        "end_commit_date": "2026-01-26T23:54:04+00:00",
+        "n": 0
+    },
+    "samples": [
+        {
+            "dir": "/home/ryang/KConfLLMRepair/workspace/samples/sample_0",
+            "config": "/home/ryang/KConfLLMRepair/workspace/samples/sample_0/base.config"
+        }
+    ]
+}

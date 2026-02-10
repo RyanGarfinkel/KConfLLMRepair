@@ -1,6 +1,6 @@
 from src.tools.klocalizer import klocalizer
 from src.kernel import KernelRepo, builder
-from src.tools.qemu import qemu
+from src.tools import qemu, randconfig
 from src.config import settings
 from src.utils import log
 import shutil
@@ -11,15 +11,30 @@ class Kernel:
     def __init__(self, kernel_src: str):
 
         self.kernel_src = kernel_src
+        self.path = kernel_src
+        self.src = kernel_src
         self.repo = KernelRepo(kernel_src)
 
-    @staticmethod
-    def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
+    @property
+    def version(self) -> str:
 
-        return KernelRepo.get_sample_ends(n, start_commit)
+        version = ''
+        patchlevel = ''
+        sublevel = ''
+        extraversion = ''
 
-    def get_kernel_version(self) -> str:
-        return self.repo.get_kernel_version()
+        with open(f'{self.path}/Makefile', 'r') as f:
+            for line in f:
+                if line.startswith('VERSION'):
+                    version = line.split('=')[1].strip()
+                elif line.startswith('PATCHLEVEL'):
+                    patchlevel = line.split('=')[1].strip()
+                elif line.startswith('SUBLEVEL'):
+                    sublevel = line.split('=')[1].strip()
+                elif line.startswith('EXTRAVERSION'):
+                    extraversion = line.split('=')[1].strip()
+
+        return f'{version}.{patchlevel}.{sublevel}{extraversion}'
     
     def create_patch(self, output_dir: str, start_commit: str | None = None) -> tuple[bool, str | None]:
         
@@ -46,23 +61,34 @@ class Kernel:
         shutil.copy(config, f'{self.repo.path}/.config')
 
         return True
+    
+    def make_rand_config(self, output: str) -> bool:
 
-    def run_klocalizer(self, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+        log.info('Generating random configuration for kernel...')
+    
+        if not randconfig.make(self.path, output):
+            log.error('Failed to generate random configuration for kernel.')
+            return False
+        
+        log.success('Random configuration generated successfully.')
 
-        if not os.path.exists(f'{self.repo.path}/.config'):
+        return True
+
+    def run_klocalizer(self, patch: str | None, log_path: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+
+        log.info('Running KLocalizer...')
+
+        if not os.path.exists(f'{self.src}/.config'):
             log.error('No .config file found in kernel source. Please load a configuration before running KLocalizer.')
             return False
 
-        log.info('Running KLocalizer for kernel...')
+        if not klocalizer.run(self.src, patch, log_path, define, undefine):
+            log.error('KLocalizer failed to run.')
+            return False
         
-        if klocalizer.run(self.repo, sample_dir, define, undefine):
-            log.success('KLocalizer completed successfully.')
-            shutil.copy(f'{self.repo.path}/.config', f'{sample_dir}/modified.config')
-            return True
-        
-        log.error('KLocalizer failed.')
+        log.success('KLocalizer completed successfully.')
 
-        return False
+        return True
 
     def build(self, config: str, log_file: str) -> bool:
 

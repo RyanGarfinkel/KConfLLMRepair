@@ -1,5 +1,5 @@
 from src.agent import get_agent_tools, Session, prompt, model
-from src.models import Sample, AgentResponse
+from src.models import Input, AgentResponse
 from singleton_decorator import singleton
 from langchain.agents import create_agent
 from src.config import settings
@@ -11,10 +11,9 @@ import os
 @singleton
 class Agent:
 
-    def repair(self, sample: Sample) -> Session:
+    def repair(self, input: Input, kernel: Kernel) -> Session:
         
-        session = Session(sample.base, sample.patch, f'{sample.output}/agent-repair')
-        kernel = Kernel(sample.kernel_src)
+        session = Session(input.base_config, input.modified_config, input.patch, input.output_dir)
 
         llm = model.get()
 
@@ -26,11 +25,12 @@ class Agent:
         messages = []
         latest_response = None
 
+        session.add_attempt(messages, latest_response)
+        session.attempts[-1].config = session.base
+
         for i in range(settings.agent.MAX_ITERATIONS + 1):
 
             log.info(f'Iteration {i} / {settings.agent.MAX_ITERATIONS}...')
-
-            session.add_attempt(messages, latest_response)
 
             if self.verify(kernel, session):
                 break
@@ -40,37 +40,54 @@ class Agent:
             agent = create_agent(llm, response_format=AgentResponse, tools=tools)
 
             # Agent Response & Processing
-            response = agent.invoke(prompt.prompt(session))
+            response = agent.invoke({'messages': prompt.prompt(session)})
 
             latest_response = response['structured_response'] if 'structured_response' in response else None
 
-            session.save(f'{sample.output}/summary.json')
+            session.save(f'{input.output_dir}/summary.json')
 
-        if session.status != 'success':
+            session.add_attempt(messages, latest_response)
+            if not self.run_klocalizer(session, kernel, latest_response.define, latest_response.undefine):
+                log.info('KLocalizer failed to run with the given configuration changes.')
+                break
+
+            session.save(f'{input.output_dir}/summary.json')
+
+        if session.status != 'Success':
             log.error('Failed to repair the configuration within the maximum number of iterations.')
         else:
             log.info('Successfully repaired the configuration!')
-            log.info(f'Saving repaired configuration to {sample.output}/repaired.config...')
-            shutil.copyfile(session.attempts[-1].config, f'{sample.output}/repaired.config')
+            log.info(f'Saving repaired configuration to {input.output_dir}/repaired.config...')
+            shutil.copyfile(session.attempts[-1].config, f'{input.output_dir}/repaired.config')
 
         return session
-
-    def verify(self, kernel: Kernel, session: Session) -> bool:
-        
-        define = session.attempts[-1].response.define if session.attempts[-1].response else []
-        undefine = session.attempts[-1].response.undefine if session.attempts[-1].response else []
-
-        kernel.load_config(session.base)
+    
+    def run_klocalizer(self, session: Session, kernel: Kernel, define: list[str], undefine: list[str]) -> bool:
 
         session.attempts[-1].klocalizer_log = f'{session.attempts[-1].dir}/klocalizer.log'
-        if not kernel.run_klocalizer(session.attempts[-1].dir, define, undefine):
+        if not kernel.run_klocalizer(session.patch, session.attempts[-1].klocalizer_log, define, undefine):
+            session.attempts[-1].klocalizer_succeeded = False
             log.info('KLocalizer failed to run with the given configuration changes.')
             return False
         
         session.attempts[-1].klocalizer_succeeded = True
         session.attempts[-1].config = f'{session.attempts[-1].dir}/modified.config'
+        shutil.copyfile(f'{kernel.src}/.config', session.attempts[-1].config)
+
+        return True
+
+    def verify(self, kernel: Kernel, session: Session) -> bool:
+
+        if not session.attempts[-1].klocalizer_succeeded:
+            log.info('Skipping verification since KLocalizer did not succeed in the last attempt.')
+            return False
+        
+        if not kernel.load_config(session.latest):
+            log.info('Failed to load latest configuration for verification.')
+            return False            
         
         session.attempts[-1].build_log = f'{session.attempts[-1].dir}/build.log'
+        print(session.attempts[-1].build_log)
         if not kernel.build(session.attempts[-1].config, session.attempts[-1].build_log):
             log.info('Build failed with the given configuration changes.')
             return False
