@@ -60,6 +60,7 @@ class Attempt(BaseModel):
             'summary': {
                 'klocalizer_succeeded': self.klocalizer_succeeded,
                 'klocalizer_log': self.klocalizer_log,
+                'modified_config': self.config,
                 'build_succeeded': self.build_succeeded,
                 'build_log': self.build_log,
                 'boot_succeeded': self.boot_succeeded,

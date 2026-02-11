@@ -86,11 +86,6 @@ class ScriptSettings(BaseModel):
         return os.path.abspath(path)
     
     @property
-    def RUN_KLOCALIZER_CONSTRAINTS_SCRIPT(self) -> str:
-        path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-klocalizer.sh')
-        return os.path.abspath(path)
-    
-    @property
     def SYZ_KCONF_SCRIPT(self) -> str:
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'syz-kconf.sh')
         return os.path.abspath(path)

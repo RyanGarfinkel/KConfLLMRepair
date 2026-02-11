@@ -42,6 +42,7 @@ def main(repair: str, output: str | None, src: str | None, model: str, jobs: int
     elif not os.path.exists(src):
         raise ValueError(f'Kernel source path {src} does not exist.')
 
+    src = os.path.abspath(src)
     repair_config(input, src)
 
 if __name__ == '__main__':

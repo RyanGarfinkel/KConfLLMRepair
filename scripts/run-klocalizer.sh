@@ -30,7 +30,7 @@ rm -f "$LOG_FILE"
 LLVM=1 CC="clang -fintegrated-as" LD=ld.lld \
         klocalizer -a x86_64 \
         --repair "$KERNEL_SRC/.config" \
-        --config-mutex-file $CONSTRAINTS_FILE 2>&1 || \
+        --config-mutex-file $CONSTRAINTS_FILE > "$LOG_FILE" 2>&1 || \
     { cd "$WORKING_DIR"; exit 1; }
 
 mv "0-$ARCH.config" ".config"

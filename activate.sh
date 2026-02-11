@@ -49,6 +49,4 @@ export CPLUS_INCLUDE_PATH=$HOME/.local/include:$HOME/.local/include/elfutils
 export LIBRARY_PATH=$HOME/.local/lib
 export LD_LIBRARY_PATH=$HOME/.local/lib
 
-export CONFIG_CONSTRAINTS=$ROOT/workspace/tools/config_constraints.txt
-
 echo '[SUCCESS] Environment variables set successfully.'
