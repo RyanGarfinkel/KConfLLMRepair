@@ -7,29 +7,9 @@ from .session import Session
 
 @singleton
 class Prompt:
-
-    @property
-    def system_mutex(self) -> SystemMessage:
-        return SystemMessage(content=f"""
-            ROLE: You are an expert Linux kernel configuration agent tasked with repairing a non-booting kernel configuration.
-            WORKFLOW:
-            1. Diagnosis & Investigation:
-            - You must first search the QEMU boot log (if previous build didn't fail) then the build log to identify the root cause of
-              the boot failure.
-            - You have access to the patch file that caused some options to change. Search through it to understand why.
-            2. Verification:
-            - Do not guess configuration names. Search the base and the latest configuration files to see what options changed and cross
-              reference that with the errors found in the logs.
-            3. Output:
-            - After gathering sufficient information from the logs and config files, output a response containing the configuration changes you want to make and your reasoning for those changes.
-            CONSTRAINTS:
-            - You have at most {settings.agent.MAX_ITERATIONS} iterations to fix the configuration.
-            - You should make use of the search tools to gather as much information as possible before making changes.
-            - You should minimize the number of configuration changes made.
-        """)
     
     @property
-    def system_config(self) -> SystemMessage:
+    def system(self) -> SystemMessage:
         return SystemMessage(content=f"""
             ROLE: You are an expert Linux kernel configuration agent tasked with repairing a non-booting kernel configuration.
             WORKFLOW:
@@ -45,12 +25,6 @@ class Prompt:
             - You should minimize the number of configuration changes made.
             - You should make use of the search tools to gather as much information as possible before making changes.
         """)
-    
-    def prompt(self, session: Session) -> list[BaseMessage]:
-        if session.patch:
-            return [self.system_mutex, self.user(session)]
-        else:
-            return [self.system_config, self.user(session)]
         
     def user(self, session: Session) -> HumanMessage:
 
@@ -95,5 +69,8 @@ class Prompt:
             OPTIONS EXCLUDED: {attempt.response.undefine if attempt.response else None}\n
             REASONING: {attempt.response.reasoning if attempt.response else None}\n
         """
-
+    
+    def prompt(self, session: Session) -> list[BaseMessage]:
+        return [self.system, self.user(session)]
+    
 prompt = Prompt()

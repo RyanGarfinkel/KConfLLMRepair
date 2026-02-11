@@ -2,19 +2,26 @@
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
 from src.models import Attempt, ToolCall, TokenUsage, AgentResponse
 from src.config import settings
+from src.utils import file_lock
+import shutil
 import json
 import os
 
 class Session:
     
-    def __init__(self, base: str, latest: str | None, patch: str | None, dir: str):
+    def __init__(self, config: str, output: str):
 
-        self.base = base
-        self.latest = latest if latest else base
-        self.patch = patch
+        self.base = config
         self.attempts: list[Attempt] = []
-        self.dir = dir
+        self.dir = output
 
+    @property
+    def latest(self) -> str | None:
+        if len(self.attempts) == 0:
+            return self.base
+        
+        return self.attempts[-1].config
+    
     @property
     def status(self) -> str:
 
@@ -31,54 +38,89 @@ class Session:
         return 'In Progress'
     
     def add_attempt(self, messages: list[BaseMessage], response: AgentResponse | None = None):
+        
+        id = len(self.attempts)
+        dir = f'{self.dir}/attempt_{id}'
 
-        ai_message = next((msg for msg in messages if isinstance(msg, AIMessage)), None)
+        messages = self.__get_latest_messages(messages)
+        tool_calls = self.__map_tool_calls(messages) if messages else []
+        
+        self.attempts.append(Attempt(
+            id=id,
+            dir=dir,
+            tool_calls=tool_calls,
+            response=response,
+            klocalizer_succeeded=response is None,
+        ))
+
+        if messages is not None:
+            ai_message = messages[0]
+            self.attempts[-1].add_token_usage(
+                input_tokens=ai_message.usage_metadata['input_tokens'] if ai_message.usage_metadata else 0,
+                output_tokens=ai_message.usage_metadata['output_tokens'] if ai_message.usage_metadata else 0,
+                total_tokens=ai_message.usage_metadata['total_tokens'] if ai_message.usage_metadata else 0
+            )
+
+        if os.path.exists(dir):
+            shutil.rmtree(dir)
+
+        os.makedirs(dir, exist_ok=True)
+
+    def __get_latest_messages(self, messages: list[BaseMessage]) -> list[BaseMessage] | None:
+
+        index = len(messages) - 1
+        while index >= 0 and not isinstance(messages[index], AIMessage):
+            index -= 1
+
+        return messages[index:] if index >= 0 else None
+
+    def __map_tool_calls(self, messages: list[BaseMessage]) -> list[ToolCall]:
+
+        ai_message = messages[0] if messages and isinstance(messages[0], AIMessage) else None
         tool_messages = [msg for msg in messages if isinstance(msg, ToolMessage)]
 
         tool_map = {tool.name: tool for tool in tool_messages}
 
         tool_calls = []
         if ai_message is not None:
+            self.attempts[-1].add_token_usage(
+                input_tokens=ai_message.usage_metadata['input_tokens'] if ai_message.usage_metadata else 0,
+                output_tokens=ai_message.usage_metadata['output_tokens'] if ai_message.usage_metadata else 0,
+                total_tokens=ai_message.usage_metadata['total_tokens'] if ai_message.usage_metadata else 0
+            )
             for tool_call in ai_message.tool_calls:
 
-                tool = tool_map.get(tool_call.name)
+                tool = tool_map.get(tool_call['name'])
                 if not tool:
                     continue
 
                 tool_calls.append(ToolCall(
-                    name=tool_call.name,
-                    args=tool_call.args,
-                    response=tool.response,
-                    token_usage=TokenUsage(
-                        input_tokens=tool.token_usage.input_tokens,
-                        output_tokens=tool.token_usage.output_tokens,
-                        total_tokens=tool.token_usage.total_tokens
-                    )
+                    name=tool_call['name'],
+                    args=tool_call['args'],
+                    response=tool.content
                 ))
 
-        self.attempts.append(Attempt(
-            id=len(self.attempts),
-            dir=f'{self.dir}/attempt_{len(self.attempts)}',
-            tool_calls=tool_calls,
-            response=response,
-            klocalizer_succeeded=response is None,
-        ))
-
-        if not os.path.exists(self.attempts[-1].dir):
-            os.makedirs(self.attempts[-1].dir)
-
+        return tool_calls
+    
     def save(self, path: str):
-        with open(path, 'w') as f:
-            json.dump(self.__dict__(), f, indent=4)
+        with file_lock:
+            with open(path, 'w') as f:
+                json.dump(self.__dict__(), f, indent=4)
     
     def __dict__(self) -> dict:
+        token_usage = TokenUsage(
+            input_tokens=sum(attempt.token_usage.input_tokens for attempt in self.attempts),
+            output_tokens=sum(attempt.token_usage.output_tokens for attempt in self.attempts),
+            total_tokens=sum(attempt.token_usage.total_tokens for attempt in self.attempts)
+        )
+        
         return {
             'summary': {
                 'status': self.status,
                 'attempts': len(self.attempts) - 1,
-                'base': self.base,
-                'patch': self.patch,
+                'original_config': self.base,
                 'repaired_config': self.attempts[-1].config if self.status == 'Success' else None,
             },
+            'token_usage': token_usage.model_dump(),
             'attempts': [attempt.model_dump() for attempt in self.attempts]
         }

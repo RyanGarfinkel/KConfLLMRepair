@@ -6,7 +6,7 @@ import subprocess
 @singleton
 class KLocalizer:
 
-    def run(self, kernel_src: str, patch: str | None, log: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+    def run(self, kernel_src: str, log: str, define: list[str] = [], undefine: list[str] = []) -> bool:
         
         with file_lock:
             with open(f'{kernel_src}/constraints.txt', 'w') as f:

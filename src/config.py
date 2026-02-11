@@ -134,8 +134,8 @@ try:
 
     print('[INFO] Configuration initialized successfully.')
 
-    print(f'[INFO] Using model: {settings.agent.MODEL}')
-    print(f'[INFO] Using model from provider: {settings.agent.PROVIDER}')
-    print(f'[INFO] Kernel source path: {settings.kernel.KERNEL_SRC}')
+    print(f'[INFO] Using {settings.agent.MODEL}')
+    print(f'[INFO] Model from {settings.agent.PROVIDER}')
+    print(f'[INFO] kernel-src {settings.kernel.KERNEL_SRC}')
 except Exception as e:
     raise RuntimeError(f'Failed to load configuration: {e}')

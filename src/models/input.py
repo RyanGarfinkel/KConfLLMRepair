@@ -5,7 +5,7 @@ import os
 class Input(BaseModel):
 
     config: str = Field(..., frozen=True)
-    output_dir: str | None = Field(default=None, frozen=True)
+    output: str | None = Field(default=None, frozen=True)
 
     @field_validator('config')
     @classmethod
@@ -14,13 +14,13 @@ class Input(BaseModel):
             raise ValueError(f'File {v} does not exist.')
         return os.path.abspath(v) if v is not None else None
 
-    @field_validator('output_dir')
+    @field_validator('output')
     @classmethod
-    def setup_output_dir(cls, v: str | None) -> str:
+    def setup_output(cls, v: str | None) -> str:
         if v is None:
-            v = os.path.join(os.getcwd(), 'agent-repair-attempts')
+            v = os.path.join(os.getcwd(), 'agent-repair')
         else:
-            v = os.path.join(os.path.abspath(v), 'agent-repair-attempts')
+            v = os.path.join(os.path.abspath(v), 'agent-repair')
         
         if os.path.exists(v):
             shutil.rmtree(v)

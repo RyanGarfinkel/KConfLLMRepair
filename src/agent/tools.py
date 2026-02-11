@@ -1,5 +1,6 @@
 from langchain_core.tools import StructuredTool, tool
 from .session import Session
+from src.utils import log
 from .rag import RAG
 import os
 
@@ -32,16 +33,18 @@ def search_config(path: str, options: list[str]) -> str:
 def get_agent_tools(session: Session) -> list[StructuredTool]:
 
     @tool
-    def search_base_config(options: list[str]) -> str:
+    def search_original_config(options: list[str]) -> str:
         """
-        Search for the presence of specific configuration options in the base config file.
+        Search for the presence of specific configuration options in the original config file.
         
         Args:
-            options (list[str]): A list of configuration options to search for in the base config file.
+            options (list[str]): A list of configuration options to search for in the original config file.
         Returns:
-            str: A string containing the values of the options searched for that were found in the base config file.
+            str: A string containing the values of the options searched for that were found in the original config file.
         """
+        log.info('Agent is searching the original config.')
         return search_config(session.base, options)
+
     
     @tool
     def search_latest_config(options: list[str]) -> str:
@@ -53,33 +56,34 @@ def get_agent_tools(session: Session) -> list[StructuredTool]:
         Returns:
             str: A string containing the values of the options searched for that were found in the latest modified config file.
         """
-        return search_config(session.attempts[-1].config, options)
+        log.info('Agent is searching the latest modified config.')
+        return search_config(session.latest, options)
     
+    klocalizer_rag = RAG(path=session.attempts[-1].klocalizer_log, type='klocalizer')
     build_rag = RAG(path=session.attempts[-1].build_log, type='build')
     boot_rag = RAG(path=session.attempts[-1].boot_log, type='qemu')
 
-    tools = [
-        search_latest_config,
-        build_rag.as_tool(
-            name='search_build_log',
-            desc='Search the build log for relevant information about build errors and warnings encountered during this attempt.'
-        ),
-        boot_rag.as_tool(
-            name='search_qemu_log',
-            desc='Search the QEMU log for relevant information about runtime errors and kernel panics encountered during this attempt.'
+    tools = [search_original_config]
+
+    if session.latest is not None or len(session.attempts) == 1:
+        tools.append(search_latest_config)
+
+    if session.attempts[-1].klocalizer_log is not None:
+        tools.append(klocalizer_rag.as_tool(
+            name='search_klocalizer_log',
+            desc='Search for specific information in the KLocalizer log of the latest attempt.')
         )
-    ]
 
-    if session.base:
-        tools.insert(0, search_base_config)
+    if session.attempts[-1].build_log is not None:
+        tools.append(build_rag.as_tool(
+            name='search_build_log',
+            desc='Search for specific information in the build log of the latest attempt.')
+        )
 
-    if session.patch:
-        patch_rag = RAG(path=session.patch, type='patch')
-        tools.append(
-            patch_rag.as_tool(
-                name='search_patch',
-                desc='Search the patch file for relevant information about code changes made in this attempt.'
-            )
+    if session.attempts[-1].boot_log is not None:
+        tools.append(boot_rag.as_tool(
+            name='search_boot_log',
+            desc='Search for specific information in the boot log of the latest attempt.')
         )
 
     return tools
