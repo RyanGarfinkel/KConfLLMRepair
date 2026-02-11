@@ -1,0 +1,22 @@
+{
+    "summary": {
+        "n": 1,
+        "successes": 0,
+        "failures": 1,
+        "input_worked": 0,
+        "avg_attempts": 7.0,
+        "avg_edit_distance": -1
+    },
+    "token_usage": {
+        "input_tokens": 21352,
+        "output_tokens": 1994,
+        "total_tokens": 23346
+    },
+    "samples": [
+        {
+            "status": "Max Attempts Reached",
+            "attempts": 7,
+            "edit_distance": -1
+        }
+    ]
+}

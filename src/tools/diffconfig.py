@@ -11,11 +11,7 @@ class DiffConfig:
 
         diffconfig_path = os.path.join(settings.kernel.KERNEL_SRC, settings.kernel.DIFFCONFIG)
 
-        cmd = [
-            diffconfig_path,
-            base_config,
-            modified_config
-        ]
+        cmd = [diffconfig_path, base_config, modified_config]
 
         result = subprocess.run(cmd, capture_output=True, text=True)
 

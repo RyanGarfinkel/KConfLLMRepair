@@ -1,8 +1,10 @@
 
 from langchain_core.messages import BaseMessage, AIMessage, ToolMessage
 from src.models import Attempt, ToolCall, TokenUsage, AgentResponse
-from src.config import settings
+from src.tools import diffconfig
 from src.utils import file_lock
+from src.config import settings
+from typing import Tuple
 import shutil
 import json
 import os
@@ -36,6 +38,13 @@ class Session:
             return 'Max Attempts Reached'
         
         return 'In Progress'
+    
+    @property
+    def edits(self) -> Tuple[list[str], int] | None:
+        if self.status != 'Success' or not self.latest:
+            return [], -1
+        
+        return diffconfig.diffconfig(self.base, self.latest)
     
     def add_attempt(self, messages: list[BaseMessage], response: AgentResponse | None = None):
         
@@ -113,6 +122,8 @@ class Session:
             output_tokens=sum(attempt.token_usage.output_tokens for attempt in self.attempts),
             total_tokens=sum(attempt.token_usage.total_tokens for attempt in self.attempts)
         )
+
+        edits, edit_distance = self.edits
         
         return {
             'summary': {
@@ -120,7 +131,9 @@ class Session:
                 'attempts': len(self.attempts) - 1,
                 'original_config': self.base,
                 'repaired_config': self.attempts[-1].config if self.status == 'Success' else None,
+                'edit_distance': edit_distance
             },
             'token_usage': token_usage.model_dump(),
-            'attempts': [attempt.model_dump() for attempt in self.attempts]
+            'attempts': [attempt.model_dump() for attempt in self.attempts],
+            'edits': edits
         }

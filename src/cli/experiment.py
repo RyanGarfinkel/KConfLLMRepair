@@ -1,12 +1,15 @@
 from src.models import Sample, Input
 from .sample import generate_samples
+from .repair import repair_config
 from src.utils import dispatcher
 from src.config import settings
+from src.utils import file_lock
 from src.agent import Session
-from .repair import repair
 from src.utils import log
 import click
 import json
+
+comleted_sessions = []
 
 def read_samples(n: int) -> list[Sample]:
     with open(f'{settings.runtime.SAMPLE_DIR}/sampling.json', 'r') as f:
@@ -27,19 +30,44 @@ def repair_sample(i: int, sample: Sample):
     log.info(f'Starting repair for sample {i + 1}...')
 
     input = Input(
-        base_config=sample.base_config,
-        modified_config=sample.modified_config,
-        patch=sample.patch,
-        output_dir=sample.sample_dir
+        config=sample.config,
+        output=f'{settings.runtime.SAMPLE_DIR}/sample_{i}'
     )
 
-    repair(input, sample.kernel_src, complete_callback=repair_callback)
+    repair_config(input, sample.kernel_src, repair_callback)
 
 def repair_callback(session: Session):
-    # TODO: Summarize all sample metrics
-    pass
+        comleted_sessions.append(session)
 
-def run_experiment(n: int, since: str, skip_generation: bool, skip_repair: bool, random: bool):
+        n = len(comleted_sessions)
+        successes = [s for s in comleted_sessions if s.status == 'Success']
+
+        with file_lock:
+            with open(f'{settings.runtime.SAMPLE_DIR}/results.json', 'w') as f:
+                json.dump({
+                    'summary': {
+                        'n': n,
+                        'successes': len([s for s in comleted_sessions if s.status == 'Success']),
+                        'failures': len([s for s in comleted_sessions if s.status != 'Success']),
+                        'input_worked': len([s for s in comleted_sessions if len(s.attempts) == 1 and s.status == 'Success']),
+                        'avg_attempts': sum(len(s.attempts) for s in comleted_sessions) / n if n > 0 else -1,
+                        'avg_edit_distance': sum(s.edits[1] for s in successes) / len(successes) if len(successes) > 0 else -1
+                    },
+                    'token_usage': {
+                        'input_tokens': sum(s.attempts[-1].token_usage.input_tokens for s in comleted_sessions),
+                        'output_tokens': sum(s.attempts[-1].token_usage.output_tokens for s in comleted_sessions),
+                        'total_tokens': sum(s.attempts[-1].token_usage.total_tokens for s in comleted_sessions),
+                    },
+                    'samples': [
+                        {
+                            'status': s.status,
+                            'attempts': len(s.attempts),
+                            'edit_distance': s.edits[1] if s.edits else -1,
+                        } for s in comleted_sessions
+                    ]
+                }, f, indent=4)
+
+def run_experiment(n: int, skip_generation: bool, skip_repair: bool):
 
     log.info(f'Starting experiment with {n} samples...')
 
@@ -51,30 +79,26 @@ def run_experiment(n: int, since: str, skip_generation: bool, skip_repair: bool,
         log.info('Generating new samples...')
 
         callback = None if skip_repair else repair_sample
-        generate_samples(n, since, random, callback)
+        generate_samples(n, callback)
     else:
         log.info('Skipping both sample generation and repair phases.')
 
 @click.command()
 @click.option('-n', default=10, help='Number of samples to generate.')
-@click.option('--random', is_flag=True, default=False, help='Randomly sample commits instead of taking the most recent ones since the provided date.')
-@click.option('--since', default='2020-01-01', help='Approximates the start commit date for sampling.')
-@click.option('--commit-window', '-w', default=25, help='Number of commits in each patch window.')
 @click.option('--jobs', '-j', default=8, help='Number of parallel jobs to use for building kernels.')
 @click.option('--model', '-m', default='gemini-3-pro-preview', help='Override the default LLM model to use for repair.')
 @click.option('--max-threads', '-t', default=8, help='Maximum number of samples generating at once.')
 @click.option('--skip-generation', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
 @click.option('--skip-repair', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
 @click.option('--cleanup', is_flag=True, help='Clean up kernel worktrees after processing samples.')
-def main(n: int, random: bool, since: str, commit_window: int, model: str, jobs: int, max_threads: int, skip_generation: bool, skip_repair: bool, cleanup: bool):
+def main(n: int, model: str, jobs: int, max_threads: int, skip_generation: bool, skip_repair: bool, cleanup: bool):
 
-    settings.runtime.COMMIT_WINDOW = commit_window
     settings.runtime.MAX_THREADS = max_threads
     settings.agent.MODEL = model
     settings.runtime.JOBS = jobs
     settings.runtime.CLEANUP = cleanup
 
-    run_experiment(n, since, skip_generation, skip_repair, random)
+    run_experiment(n, skip_generation, skip_repair)
 
 if __name__ == '__main__':
     main()

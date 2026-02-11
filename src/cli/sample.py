@@ -92,6 +92,10 @@ def generate_samples(n: int, complete_callback: Callable[[int, Sample], None] | 
             
         if complete_callback is not None:
             complete_callback(i, sample)
+
+        if settings.runtime.CLEANUP:
+            log.info(f'Cleaning up sample {i + 1} worktree...')
+            worktree.cleanup(sample.kernel_src)
         
     tasks = [lambda idx=i: process(idx) for i in range(n)]
     dispatcher.run_tasks(tasks, desc='Generating samples')
@@ -106,21 +110,14 @@ def generate_samples(n: int, complete_callback: Callable[[int, Sample], None] | 
 def main(n: int, jobs: int, max_threads: int, cleanup: bool):
 
     settings.runtime.MAX_THREADS = max_threads
+    settings.runtime.CLEANUP = cleanup
     settings.runtime.JOBS = jobs
 
     log.info(f'Starting sample generation for {n} samples...')
 
-    _, samples = generate_samples(n)
+    generate_samples(n)
 
     log.info('Sample generation completed.')
-
-    if not cleanup:
-        return
-    
-    log.info('Cleaning up kernel worktrees...')
-
-    for sample in samples:
-        worktree.cleanup(sample.kernel_src)
 
 if __name__ == '__main__':
     main()
