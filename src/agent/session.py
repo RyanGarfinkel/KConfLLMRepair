@@ -44,7 +44,7 @@ class Session:
         if self.status != 'Success' or not self.latest:
             return [], -1
         
-        return diffconfig.diffconfig(self.base, self.latest)
+        return diffconfig.compare(self.base, self.latest)
     
     def add_attempt(self, messages: list[BaseMessage], response: AgentResponse | None = None):
         

@@ -36,7 +36,7 @@ class Agent:
             if i > 0:
                 log.info(f'Iteration {i} / {settings.agent.MAX_ITERATIONS}...')
 
-            if self.verify(kernel, session):
+            if self.verify(kernel, session) or len(session.attempts) >= settings.agent.MAX_ITERATIONS:
                 break
             
             # Agent Setup             
