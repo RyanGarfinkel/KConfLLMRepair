@@ -5,5 +5,5 @@ workspace/tools
 venv/
 config/
 __pycache__/
-sample_*/
+samples/
 .env

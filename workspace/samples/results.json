@@ -1,38 +1,18 @@
 {
     "summary": {
-        "n": 5,
+        "n": 1,
         "successes": 0,
-        "failures": 5,
+        "failures": 1,
         "input_worked": 0,
         "avg_attempts": 5.0,
         "avg_edit_distance": -1
     },
     "token_usage": {
-        "input_tokens": 104227,
-        "output_tokens": 9268,
-        "total_tokens": 113495
+        "input_tokens": 15583,
+        "output_tokens": 3502,
+        "total_tokens": 19085
     },
     "samples": [
-        {
-            "status": "Max Attempts Reached",
-            "attempts": 5,
-            "edit_distance": -1
-        },
-        {
-            "status": "Max Attempts Reached",
-            "attempts": 5,
-            "edit_distance": -1
-        },
-        {
-            "status": "Max Attempts Reached",
-            "attempts": 5,
-            "edit_distance": -1
-        },
-        {
-            "status": "Max Attempts Reached",
-            "attempts": 5,
-            "edit_distance": -1
-        },
         {
             "status": "Max Attempts Reached",
             "attempts": 5,
