@@ -1,0 +1,22 @@
+{
+    "summary": {
+        "n": 1,
+        "successes": 1,
+        "failures": 0,
+        "input_worked": 0,
+        "avg_attempts": 8.0,
+        "avg_edit_distance": 5429.0
+    },
+    "token_usage": {
+        "input_tokens": 24102,
+        "output_tokens": 1078,
+        "total_tokens": 25180
+    },
+    "samples": [
+        {
+            "status": "Success",
+            "attempts": 8,
+            "edit_distance": 5429
+        }
+    ]
+}

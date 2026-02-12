@@ -1,4 +1,3 @@
-import os
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_community.document_loaders import TextLoader
@@ -6,6 +5,8 @@ from langchain_community.vectorstores import FAISS
 from langchain_core.tools import StructuredTool
 from langchain_openai import OpenAIEmbeddings
 from src.config import settings
+from src.utils import log
+import os
 
 patch_separators = [
     '\n',
@@ -153,6 +154,7 @@ class RAG:
     
     def search(self, query: str) -> str:
         
+        log.info(f'Agent is querying the {self.type} log.')
         if not self.vector_store:
             self.queries.append({
                 'file': self.type,

@@ -1,97 +1,124 @@
-from src.tools.klocalizer import klocalizer
-from src.kernel import KernelRepo, builder
-from src.tools.qemu import qemu
+from src.tools import klocalizer, qemu, randconfig
 from src.config import settings
+from src.kernel import builder
 from src.utils import log
+from git import Repo
 import shutil
 import os
 
 class Kernel:
 
-    def __init__(self, kernel_src: str):
-
-        self.kernel_src = kernel_src
-        self.repo = KernelRepo(kernel_src)
-
-    @staticmethod
-    def get_sample_ends(n: int, start_commit: str | None = None) -> list[str]:
-
-        return KernelRepo.get_sample_ends(n, start_commit)
-
-    def get_kernel_version(self) -> str:
-        return self.repo.get_kernel_version()
-    
-    def create_patch(self, output_dir: str, start_commit: str | None = None) -> tuple[bool, str | None]:
+    def __init__(self, src: str):
         
-        log.info(f'Creating patch for kernel...')
+        if not os.path.exists(src):
+            raise ValueError(f'Kernel source path does not exist: {src}')
+        
+        self.src = src
 
-        success, start_commit = self.repo.make_patch(output_dir, start_commit)
-
-        if not success:
-            log.error('Failed to create patch for kernel.')
-            return False, None
-
-        log.success('Patch created successfully.')
-
-        return success, start_commit
+    @property
+    def version(self) -> str:
     
-    def load_config(self, config: str) -> bool:
+        version = ''
+        patchlevel = ''
+        sublevel = ''
+        extraversion = ''
 
-        log.info(f'Loading configuration for kernel...')
+        with open(f'{self.src}/Makefile', 'r') as f:
+            for line in f:
+                if line.startswith('VERSION'):
+                    version = line.split('=')[1].strip()
+                elif line.startswith('PATCHLEVEL'):
+                    patchlevel = line.split('=')[1].strip()
+                elif line.startswith('SUBLEVEL'):
+                    sublevel = line.split('=')[1].strip()
+                elif line.startswith('EXTRAVERSION'):
+                    extraversion = line.split('=')[1].strip()
 
-        if not os.path.exists(config):
-            log.error(f'Configuration file {config} does not exist.')
+        return f'{version}.{patchlevel}.{sublevel}{extraversion}'
+
+    def load_config(self, path: str) -> bool:
+
+        log.info(f'Loading config into kernel: {path}')
+
+        if not os.path.basename(path).endswith('.config'):
+            log.error(f'Provided config file is not a .config file: {path}')
+            return False
+
+        if not os.path.exists(path):
+            log.error(f'Config file does not exist: {path}')
             return False
         
-        shutil.copy(config, f'{self.repo.path}/.config')
+        shutil.copy(path, f'{self.src}/.config')
 
         return True
 
-    def run_klocalizer(self, sample_dir: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+    def make_patch(self, path: str) -> bool:
 
-        if not os.path.exists(f'{self.repo.path}/.config'):
+        repo = Repo(self.src)
+
+        diff = repo.git.diff(f'HEAD~{settings.runtime.COMMIT_WINDOW}..HEAD')
+        
+        with open(path, 'w') as f:
+            f.write(diff)
+
+        return True
+    
+    def make_rand_config(self, path: str) -> bool:
+
+        log.info('Generating random configuration...')
+
+        if not randconfig.make(self.src, path):
+            log.error('Randconfig failed to generate a base configuration.')
+            return False
+        
+        log.success('Random configuration generated successfully.')
+
+        return True
+    
+    def run_klocalizer(self, log_path: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+
+        log.info('Running KLocalizer...')
+        
+        if not os.path.exists(f'{self.src}/.config'):
             log.error('No .config file found in kernel source. Please load a configuration before running KLocalizer.')
             return False
 
-        log.info('Running KLocalizer for kernel...')
+        if not klocalizer.run(self.src, log_path, define, undefine):
+            log.error('KLocalizer failed to run.')
+            return False
         
-        if klocalizer.run(self.repo, sample_dir, define, undefine):
-            log.success('KLocalizer completed successfully.')
-            shutil.copy(f'{self.repo.path}/.config', f'{sample_dir}/modified.config')
-            return True
+        log.success('KLocalizer completed successfully.')
+
+        return True
+    
+    def build(self, path: str) -> bool:
         
-        log.error('KLocalizer failed.')
-
-        return False
-
-    def build(self, config: str, log_file: str) -> bool:
-
-        self.load_config(config)
-
         log.info('Building kernel...')
 
-        built_successfully = builder.build(self.repo, log_file)
+        if not os.path.exists(f'{self.src}/.config'):
+            log.error('Config file not found in kernel source. Please load a configuration before building.')
+            return False
 
-        if built_successfully:
-            log.success('Kernel built successfully.')
-        else:
-            log.error('Kernel build failed. Check log for details.')
+        if not builder.build(self.src, path):
+            log.error('Build failed. Check log for details.')
+            return False
+        
+        log.success('Build completed successfully.')
 
-        return built_successfully
-
-    def boot(self, log_file: str) -> bool:
+        return True
+    
+    def boot(self, path: str) -> bool:
 
         log.info('Running QEMU test on kernel...')
 
-        boot_success = qemu.test(self, log_file)
-
-        if boot_success:
-            log.success('Kernel booted successfully in QEMU.')
-        else:
-            log.error('Kernel failed to boot in QEMU. Check log for details.')
-
-        return boot_success
-    
-    def cleanup(self):
+        if not os.path.exists(f'{self.src}/{settings.kernel.BZIMAGE}'):
+            log.error('Kernel binary not found. Please build the kernel before booting.')
+            return False
         
-        KernelRepo.cleanup(self.kernel_src)
+        if not qemu.test(self.src, path):
+            log.error('QEMU test failed. Check log for details.')
+            return False
+
+        log.success('QEMU test completed successfully.')
+
+        return True

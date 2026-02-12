@@ -4,11 +4,11 @@ from src.utils import log
 import subprocess
 
 @singleton
-class Syzkaller:
+class RandConfig:
 
-    def run(self, kernel_src: str, output: str) -> bool:
+    def make(self, kernel_src: str, output: str) -> bool:
 
-        cmd = ['bash', settings.scripts.SYZ_KCONF_SCRIPT, kernel_src, output, settings.kernel.SYZKCONF_INSTANCE]
+        cmd = ['bash', settings.scripts.RAND_CONFIG_SCRIPT, kernel_src, output]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
@@ -18,5 +18,5 @@ class Syzkaller:
 
         return result.returncode == 0
 
-syzkaller = Syzkaller()
+randconfig = RandConfig()
         

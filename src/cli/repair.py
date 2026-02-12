@@ -1,135 +1,49 @@
-from src.core import Agent, Kernel
+from src.core.kernel import Kernel
 from src.config import settings
-from src.models import Sample
+from src.agent import Session
+from src.models import Input
+from typing import Callable
+from src.core import agent
 from src.utils import log
-import shutil
 import click
 import os
 
-def update_provider(model: str | None):
+def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Session], None] | None = None):
 
-        if model is None:
-            model = 'gpt-5.2' if settings.agent.OPENAI_API_KEY else 'gemini-3-pro-preview' if settings.agent.GOOGLE_API_KEY else None
-
-        if model is None:
-            raise ValueError('Must have at least one valid API key to initialize LLM.')
-        
-        if model.startswith('gpt'):
-
-            if not settings.agent.OPENAI_API_KEY:
-                raise ValueError('OPENAI_API_KEY is not set but model override specifies an OpenAI model.')
-            
-            settings.agent.PROVIDER = 'openai'
-            settings.agent.MODEL = model
-        elif model.startswith('gemini'):
-            
-            if not settings.agent.GOOGLE_API_KEY:
-                raise ValueError('GOOGLE_API_KEY is not set but model override specifies a Google model.')
-            
-            settings.agent.PROVIDER = 'google'
-            settings.agent.MODEL = model
-        else:
-            raise ValueError(f'Unknown model: {model}')
-
-        log.info(f'Agent provider set to {settings.agent.PROVIDER}.')
-        log.info(f'Agent model set to {settings.agent.MODEL}.')
-
-def initial_attempt(sample: Sample) -> bool:
-
-    log.info('Verifying modified configuration does not boot...')
-
-    attempt_dir = f'{sample.output}/attempt_0'
-    if os.path.exists(attempt_dir):
-        shutil.rmtree(attempt_dir)
-
-    # Setup attempt_0 directory
-    os.makedirs(attempt_dir, exist_ok=True)
-    shutil.copy(sample.base, f'{attempt_dir}/base.config')
-    shutil.copy(sample.modified, f'{attempt_dir}/modified.config')
-    shutil.copy(sample.patch, f'{attempt_dir}/changes.patch')
-
-    # Building the kernel
-    kernel = Kernel(sample.kernel_src)
-    if not kernel.build(sample.modified, f'{attempt_dir}/build.log'):
-        log.info('Build failed. Will proceed with agent repair.')
-        return True
+    log.info('Starting agent repair process...')
     
-    # Booting the kernel
-    if not kernel.boot(f'{attempt_dir}/qemu.log'):
-        log.info('Boot failed. Will proceed with agent repair.')
-        return True
-    
-    log.info('Modified configuration boots successfully. No repair needed.')
-    
-    return False
+    kernel = Kernel(kernel_src)
 
-def repair(sample: Sample, model: str | None):
+    session = agent.repair(input, kernel)
 
-    if not initial_attempt(sample):
-        return
+    log.info(f'See {input.output} for full details of the agent repair attempts.')
 
-    log.info('Creating agent for repair process...')
-    
-    update_provider(model)
-    agent = Agent()
-
-    log.success('Agent created successfully.')
-    log.info('Starting repair process...')
-
-    result = agent.repair(sample)
-
-    log.info('Repair process completed. Saving results...')
-
-    result.save(f'{sample.output}/result.json')
+    if complete_callback is not None:
+        complete_callback(session)
 
 @click.command()
-@click.option('--base', required=True, help='Path to the original configuration file.')
-@click.option('--modified', required=True, help='Path to the modified configuration file.')
-@click.option('--patch', required=True, help='Path to the patch file that the modification tries to include.')
+@click.option('--repair', required=True, help='Path to configuration file to repair.')
 @click.option('--output', default=None, help='Path to direct the agent attempts and results, otherwise set to the current working directory.')
-@click.option('--kernel-src', default=None, help='Path to the kernel source code, otherwise set to the environment variable KERNEL_SRC.')
-@click.option('--model', default=None, help='Model name of you wish to use for repair, otherwise set to a default model based on available API keys.')
-@click.option('--max-iterations', default=5, help='Maximum number of iterations for the agent to attempt repairs, otherwise set to 5.')
-@click.option('--jobs', default=None, help='Number of jobs to run when building the kernel, otherwise set to 8.')
-def main(base: str, modified: str, patch: str, output: str | None, kernel_src: str | None, model: str | None, jobs: int | None, max_iterations: int):
+@click.option('--src', default=None, help='Path to the kernel source code, otherwise set to the environment variable KERNEL_SRC.')
+@click.option('--model', default='gemini-3-pro-preview', help='Model name of you wish to use for repair.')
+@click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
+def main(repair: str, output: str | None, src: str | None, model: str, jobs: int):
 
-    # Validate inputs
-    if not os.path.exists(base):
-        raise ValueError(f'Base configuration file {base} does not exist.')
-    
-    if not os.path.exists(modified):
-        raise ValueError(f'Modified configuration file {modified} does not exist.')
-    
-    if not os.path.exists(patch):
-        raise ValueError(f'Patch file {patch} does not exist.')
-
-    if output is None:
-        output = os.getcwd() + '/agent-repair-attempts'
-    
-    if kernel_src is None:
-        kernel_src = settings.kernel.KERNEL_SRC
-    elif not os.path.exists(kernel_src):
-        raise ValueError(f'Kernel source path {kernel_src} does not exist.')
-
-    if jobs is not None:
-        settings.runtime.JOBS = jobs
-
-    settings.agent.MAX_ITERATIONS = max_iterations
-    
-    # Repair Process
-    os.makedirs(output, exist_ok=True)
-    
-    sample = Sample(
-        base=os.path.abspath(base),
-        modified=os.path.abspath(modified),
-        patch=os.path.abspath(patch),
-        kernel_src=os.path.abspath(kernel_src),
-        output=os.path.abspath(output) + '/agent-repair-attempts',
-        start_commit=None,
-        end_commit=None,
+    input = Input(
+        config=repair,
+        output=output
     )
 
-    repair(sample, model)
+    settings.runtime.JOBS = jobs
+    settings.agent.MODEL = model
+    
+    if src is None:
+        src = settings.kernel.KERNEL_SRC
+    elif not os.path.exists(src):
+        raise ValueError(f'Kernel source path {src} does not exist.')
+
+    src = os.path.abspath(src)
+    repair_config(input, src)
 
 if __name__ == '__main__':
     main()

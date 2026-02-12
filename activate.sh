@@ -24,7 +24,7 @@ export WORKTREE_DIR=$ROOT/workspace/worktrees
 
 # Build Settings
 export CROSS_COMPILE=x86_64-linux-gnu-
-export DEBIAN_IMG=$ROOT/workspace/images/bullseye.img            # $ROOT/workspace/images/debian.raw
+export DEBIAN_IMG=$ROOT/workspace/images/bullseye.img # $ROOT/workspace/images/debian.raw
 export GOROOT=$HOME/.local/go
 export ARCH=x86_64
 
@@ -48,7 +48,5 @@ export C_INCLUDE_PATH=$HOME/.local/include:$HOME/.local/include/elfutils
 export CPLUS_INCLUDE_PATH=$HOME/.local/include:$HOME/.local/include/elfutils
 export LIBRARY_PATH=$HOME/.local/lib
 export LD_LIBRARY_PATH=$HOME/.local/lib
-
-export CONFIG_CONSTRAINTS=$ROOT/workspace/tools/config_constraints.txt
 
 echo '[SUCCESS] Environment variables set successfully.'

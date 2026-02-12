@@ -1,15 +1,13 @@
-from src.kernel import KernelRepo, KConfig
 from singleton_decorator import singleton
 from src.config import settings
-from src.utils import log
 import subprocess
 
 @singleton
 class Builder:
 
-    def build(self, repo: KernelRepo, log_file: str) -> bool:
+    def build(self, kernel_src: str, log_file: str) -> bool:
 
-        cmd = ['bash', settings.scripts.BUILD_SCRIPT, repo.path, log_file, str(settings.runtime.JOBS)]
+        cmd = ['bash', settings.scripts.BUILD_SCRIPT, kernel_src, log_file, str(settings.runtime.JOBS)]
         result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
         return result.returncode == 0
