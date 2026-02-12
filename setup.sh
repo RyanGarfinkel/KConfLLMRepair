@@ -3,23 +3,32 @@ set -e
 
 ROOT=$(pwd)
 
+SKIP_DEPENDENCIES=false
+if [ "$1" = "skip" ]; then
+    SKIP_DEPENDENCIES=true
+fi
+
 # Dependency Installation
-echo '[INFO] Installing dependencies...'
+if [ "$SKIP_DEPENDENCIES" != "true" ]; then
 
-# sudo apt-get update
-# sudo apt-get install -y \
-#      build-essential make gcc g++ \
-#      flex bison bc \
-#      libssl-dev libelf-dev libncurses-dev dwarves \
-#      python3 python3-dev python3-pip pipx lz4 \
-#      git wget unzip xz-utils lftp default-jdk \
-#      openjdk-8-jdk libz3-java libjson-java sat4j \
-#      qemu-system-x86 libdw-dev ccache \
-#      clang-15 llvm-15 lld-15 \
-#      gcc-x86-64-linux-gnu
+    echo '[INFO] Installing dependencies...'
 
-# sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
-# sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
+    sudo apt-get update
+    sudo apt-get install -y \
+        build-essential make gcc g++ \
+        flex bison bc \
+        libssl-dev libelf-dev libncurses-dev dwarves \
+        python3 python3-dev python3-pip pipx lz4 \
+        git wget unzip xz-utils lftp default-jdk \
+        openjdk-8-jdk libz3-java libjson-java sat4j \
+        qemu-system-x86 libdw-dev ccache \
+        clang-15 llvm-15 lld-15 \
+        gcc-x86-64-linux-gnu
+
+    sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
+    sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
+else
+    echo '[ERROR] Cannot install dependencies. This script may fail. To prevent this, please manually install the required dependencies.'
 
 # Workspace Setup
 echo '[INFO] Setting up the workspace directory...'
@@ -34,22 +43,17 @@ echo 'Workspace directrories created successfully.'
 # Kernel Installation
 if [ ! -d 'workspace/kernel' ]; then
     echo '[INFO] Cloning Linux Kernel...'
-    git clone https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git workspace/kernel
+    git clone --depth 1 --branch v6.19 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git workspace/kernel
     echo '[SUCCESS] Linux Kernel cloned successfully.'
 else
     echo '[INFO] Linux Kernel already cloned at workspace/kernel'
     echo '[INFO] Pulling latest changes...'
     cd workspace/kernel
     git fetch origin
-    git reset --hard origin/master
+    git reset --hard origin/v6.19
     echo '[SUCCESS] Linux Kernel updated successfully.'
     cd $ROOT
 fi
-
-cd workspace/images
-wget https://raw.githubusercontent.com/google/syzkaller/master/tools/create-image.sh -O create-image.sh
-chmod +x create-image.sh
-./create-image.sh
 
 # Debian Image Installation
 if [ ! -f 'workspace/images/debian.raw' ]; then
@@ -152,6 +156,15 @@ else
     echo '[INFO] SuperC already exists at workspace/tools/superc'
 fi
 
+# KMax Installation
+if [ ! -d 'workspace/tools/kmax' ]; then
+    echo '[INFO] Cloning KMax...'
+    git clone --branch dev/klocalizer-add-check-mutex --depth 1 https://github.com/paulgazz/kmax.git workspace/tools/kmax
+    echo '[SUCCESS] KMax cloned successfully.'
+else
+    echo '[INFO] KMax already exists at workspace/tools/kmax'
+fi
+
 # Python Virtual Environment Setup
 echo '[INFO] Setting up Python virtual environment...'
 if [ ! -d "venv" ]; then
@@ -162,6 +175,13 @@ else
 fi
 
 . venv/bin/activate
+
+echo '[INFO] Installing KMax dependencies...'
+cd workspace/tools/kmax
+pip install .
+cd $ROOT
+
+echo '[INFO] Installing Python dependencies...'
 
 pip install --upgrade pip
 pip install -r requirements.txt

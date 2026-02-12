@@ -87,15 +87,17 @@ def run_experiment(n: int, skip_generation: bool, skip_repair: bool):
 @click.option('-n', default=10, help='Number of samples to generate.')
 @click.option('--jobs', '-j', default=8, help='Number of parallel jobs to use for building kernels.')
 @click.option('--model', '-m', default='gemini-3-pro-preview', help='Override the default LLM model to use for repair.')
+@click.option('--max-iterations', default=5, help='Maximum number of repair iterations per sample.')
 @click.option('--max-threads', '-t', default=8, help='Maximum number of samples generating at once.')
 @click.option('--skip-generation', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
 @click.option('--skip-repair', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
 @click.option('--cleanup', is_flag=True, help='Clean up kernel worktrees after processing samples.')
-def main(n: int, model: str, jobs: int, max_threads: int, skip_generation: bool, skip_repair: bool, cleanup: bool):
+def main(n: int, model: str, jobs: int, max_threads: int, max_iterations: int, skip_generation: bool, skip_repair: bool, cleanup: bool):
 
     settings.runtime.MAX_THREADS = max_threads
     settings.agent.MODEL = model
     settings.runtime.JOBS = jobs
+    settings.agent.MAX_ITERATIONS = max_iterations
     settings.runtime.CLEANUP = cleanup
 
     run_experiment(n, skip_generation, skip_repair)
