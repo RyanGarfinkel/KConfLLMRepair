@@ -72,7 +72,7 @@ class Prompt:
             ATTEMPT {i} / {settings.agent.MAX_ITERATIONS}:
             KLOCALIZER: {"Success" if attempt.klocalizer_succeeded else "Failed"}
             BUILD: {"Success" if attempt.build_succeeded else "Failed"}
-            BOOT: {"Success" if attempt.boot_succeeded else "Failed"}
+            BOOT: { attempt.boot_succeeded }
             OPTIONS INCLUDED: {attempt.response.define if attempt.response else None}
             OPTIONS EXCLUDED: {attempt.response.undefine if attempt.response else None}
             REASONING: {attempt.response.reasoning if attempt.response else None}
