@@ -1,3 +1,4 @@
+from src.embeddings import BaseEmbedding, gemini_embeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.language_models import BaseChatModel
 from singleton_decorator import singleton
@@ -7,7 +8,7 @@ from src.config import settings
 @singleton
 class Model:
 
-    def get(self) -> BaseChatModel:
+    def get_llm(self) -> BaseChatModel:
 
         if settings.agent.PROVIDER == 'openai':
             if settings.agent.OPENAI_API_KEY:
@@ -21,5 +22,13 @@ class Model:
                 raise ValueError('Google API key is not configured.')
         else:
             raise ValueError(f'Unknown model provider for model: {settings.agent.MODEL}')
+        
+    def get_embedding_model(self) -> BaseEmbedding:
+        if settings.agent.PROVIDER == 'openai':
+            raise NotImplementedError('OpenAI embedding model is not implemented yet.')
+        elif settings.agent.PROVIDER == 'google':
+            return gemini_embeddings
+        else:
+            raise ValueError(f'Unknown model provider for embedding model: {settings.agent.PROVIDER}')
 
 model = Model()

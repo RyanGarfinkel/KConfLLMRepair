@@ -25,9 +25,10 @@ def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Se
 @click.option('--repair', required=True, help='Path to configuration file to repair.')
 @click.option('--output', default=None, help='Path to direct the agent attempts and results, otherwise set to the current working directory.')
 @click.option('--src', default=None, help='Path to the kernel source code, otherwise set to the environment variable KERNEL_SRC.')
-@click.option('--model', default='gemini-3-pro-preview', help='Model name of you wish to use for repair.')
+@click.option('--model', '-m', default='gemini-3-pro-preview', help='Model name of you wish to use for repair.')
 @click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
-def main(repair: str, output: str | None, src: str | None, model: str, jobs: int):
+@click.option('--max-iterations', default=5, help='Maximum number of repair iterations per sample.')
+def main(repair: str, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int):
 
     input = Input(
         config=repair,
@@ -36,7 +37,8 @@ def main(repair: str, output: str | None, src: str | None, model: str, jobs: int
 
     settings.runtime.JOBS = jobs
     settings.agent.MODEL = model
-    
+    settings.agent.MAX_ITERATIONS = max_iterations
+
     if src is None:
         src = settings.kernel.KERNEL_SRC
     elif not os.path.exists(src):

@@ -1,7 +1,7 @@
 from langchain_core.tools import StructuredTool, tool
+from src.models import ToolCall, EmbeddingUsage
+from .search import LogSearch
 from .session import Session
-from src.utils import log
-from .rag import RAG
 import os
 
 def search_config(path: str, options: list[str]) -> str:
@@ -42,9 +42,14 @@ def get_agent_tools(session: Session) -> list[StructuredTool]:
         Returns:
             str: A string containing the values of the options searched for that were found in the original config file.
         """
-        log.info('Agent is searching the original config.')
-        return search_config(session.base, options)
+        results = search_config(session.base, options)
+        session.attempts[-1].tool_calls.append(ToolCall(
+            name='search_original_config',
+            args={ 'options': options },
+            response=results,
+        ))
 
+        return results
     
     @tool
     def search_latest_config(options: list[str]) -> str:
@@ -56,34 +61,97 @@ def get_agent_tools(session: Session) -> list[StructuredTool]:
         Returns:
             str: A string containing the values of the options searched for that were found in the latest modified config file.
         """
-        log.info('Agent is searching the latest modified config.')
-        return search_config(session.latest, options)
-    
-    klocalizer_rag = RAG(path=session.attempts[-1].klocalizer_log, type='klocalizer')
-    build_rag = RAG(path=session.attempts[-1].build_log, type='build')
-    boot_rag = RAG(path=session.attempts[-1].boot_log, type='qemu')
+        results = search_config(session.latest, options)
+        session.attempts[-1].tool_calls.append(ToolCall(
+            name='search_latest_config',
+            args={ 'options': options },
+            response=results,
+        ))
 
+        return results
+    
+    klocalizer_rag = LogSearch(session.attempts[-2].klocalizer_log, type='klocalizer')
+    build_rag = LogSearch(session.attempts[-2].build_log, type='build')
+    boot_rag = LogSearch(path=session.attempts[-2].boot_log, type='boot')
+
+    session.attempts[-1].embedding_usage = EmbeddingUsage(
+        klocalizer_log_tokens=klocalizer_rag.token_usage,
+        build_log_tokens=build_rag.token_usage,
+        boot_log_tokens=boot_rag.token_usage,
+    )
+
+    @tool
+    def search_klocalizer_log(query: str) -> str:
+        """
+        Search for specific information in the KLocalizer log of the latest attempt.
+
+        Args:
+            query (str): A string query to search for in the KLocalizer log.
+        Returns:
+            str: A string containing the relevant information from the KLocalizer log that matches the query
+        """
+        results, token_usage = klocalizer_rag.query(query)
+        session.attempts[-1].tool_calls.append(ToolCall(
+            name='search_klocalizer_log',
+            args={ 'query': query },
+            response=results,
+            token_usage=token_usage,
+        ))
+
+        return results
+    
+    @tool
+    def search_build_log(query: str) -> str:
+        """
+        Search for specific information in the build log of the latest attempt.
+
+        Args:
+            query (str): A string query to search for in the build log.
+        Returns:
+            str: A string containing the relevant information from the build log that matches the query
+        """
+        results, token_usage = build_rag.query(query)
+        session.attempts[-1].tool_calls.append(ToolCall(
+            name='search_build_log',
+            args={ 'query': query },
+            response=results,
+            token_usage=token_usage,
+        ))
+
+        return results
+    
+    @tool
+    def search_boot_log(query: str) -> str:
+        """
+        Search for specific information in the boot log of the latest attempt.
+
+        Args:
+            query (str): A string query to search for in the boot log.
+        Returns:
+            str: A string containing the relevant information from the boot log that matches the query
+        """
+        results, token_usage = boot_rag.query(query)
+        session.attempts[-1].tool_calls.append(ToolCall(
+            name='search_boot_log',
+            args={ 'query': query },
+            response=results,
+            token_usage=token_usage,
+        ))
+
+        return results
+    
     tools = [search_original_config]
 
     if session.latest is not None or len(session.attempts) == 1:
         tools.append(search_latest_config)
 
-    if session.attempts[-1].klocalizer_log is not None:
-        tools.append(klocalizer_rag.as_tool(
-            name='search_klocalizer_log',
-            desc='Search for specific information in the KLocalizer log of the latest attempt.')
-        )
+    if session.attempts[-2].klocalizer_log is not None:
+        tools.append(search_klocalizer_log)
 
-    if session.attempts[-1].build_log is not None:
-        tools.append(build_rag.as_tool(
-            name='search_build_log',
-            desc='Search for specific information in the build log of the latest attempt.')
-        )
+    if session.attempts[-2].build_log is not None:
+        tools.append(search_build_log)
 
-    if session.attempts[-1].boot_log is not None:
-        tools.append(boot_rag.as_tool(
-            name='search_boot_log',
-            desc='Search for specific information in the boot log of the latest attempt.')
-        )
-
+    if session.attempts[-2].boot_log is not None:
+        tools.append(search_boot_log)
+        
     return tools

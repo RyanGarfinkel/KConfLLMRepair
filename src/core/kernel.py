@@ -1,6 +1,7 @@
 from src.tools import klocalizer, qemu, randconfig
 from src.config import settings
 from src.kernel import builder
+from typing import Literal
 from src.utils import log
 from git import Repo
 import shutil
@@ -107,18 +108,22 @@ class Kernel:
 
         return True
     
-    def boot(self, path: str) -> bool:
+    def boot(self, path: str) -> Literal['yes', 'maintenance', 'no']:
 
         log.info('Running QEMU test on kernel...')
 
         if not os.path.exists(f'{self.src}/{settings.kernel.BZIMAGE}'):
             log.error('Kernel binary not found. Please build the kernel before booting.')
-            return False
+            return 'no'
         
-        if not qemu.test(self.src, path):
+        result = qemu.test(self.src, path)
+        if result == 'no':
             log.error('QEMU test failed. Check log for details.')
-            return False
+            return 'no'
+        elif result == 'maintenance':
+            log.warning('QEMU test returned maintenance mode.')
+            return 'maintenance'
 
         log.success('QEMU test completed successfully.')
 
-        return True
+        return 'yes'

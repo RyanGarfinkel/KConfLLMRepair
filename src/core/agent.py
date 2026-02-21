@@ -1,5 +1,6 @@
+from src.models import Input, AgentResponse, Attempt, ToolCall, TokenUsage
 from src.agent import get_agent_tools, Session, prompt, model
-from src.models import Input, AgentResponse
+from langchain_core.language_models import BaseChatModel
 from singleton_decorator import singleton
 from langchain.agents import create_agent
 from src.config import settings
@@ -16,58 +17,149 @@ class Agent:
     def repair(self, input: Input, kernel: Kernel) -> Session:
         
         session = Session(input.config, input.output)
-        llm = model.get()
+        llm = model.get_llm()
 
-        if os.path.exists(session.dir):
-            shutil.rmtree(session.dir)
+        self.__make_dir(session.dir)
 
-        os.makedirs(session.dir, exist_ok=True)
+        inital_attempt = self.__inital_attempt(kernel, session)
+        session.attempts.append(inital_attempt)
 
-        messages = []
-        latest_response = None
+        if inital_attempt.boot_succeeded == 'yes':
+            return session
 
-        session.add_attempt(messages, latest_response)
-        session.attempts[-1].config = session.base
+        log.info('Beginning repair process...')
 
-        log.info('Verifying configuration boots...')
-
-        for i in range(settings.agent.MAX_ITERATIONS + 1):
-
-            if i > 0:
-                log.info(f'Iteration {i} / {settings.agent.MAX_ITERATIONS}...')
-
-            if self.verify(kernel, session) or len(session.attempts) >= settings.agent.MAX_ITERATIONS:
-                break
+        for i in range(settings.agent.MAX_ITERATIONS):
             
-            # Agent Setup             
-            tools = get_agent_tools(session)
-            agent = create_agent(llm, response_format=AgentResponse, tools=tools)
+            if session.status == 'success':
+                break
 
-            # Agent Response & Processing
-            response = agent.invoke({'messages': prompt.prompt(session)})
-            self.save_raw_response(f'{input.output}/agent-raw.json', response)
+            log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS}...')
 
-            messages = response.get('messages', [])
-            latest_response = response['structured_response'] if 'structured_response' in response else None
+            self.__attempt(llm, kernel, session)
 
             session.save(f'{input.output}/summary.json')
 
-            session.add_attempt(messages, latest_response)
-
-            self.run_klocalizer(session, kernel, latest_response.define, latest_response.undefine)
-
-            session.save(f'{input.output}/summary.json')
-
-        if session.status != 'Success':
-            log.error('Failed to repair the configuration within the maximum number of iterations.')
-        else:
-            log.info('Successfully repaired the configuration!')
-            log.info(f'Saving repaired configuration to {input.output}/repaired.config...')
+        if session.status == 'success':
+            log.success('Repair process completed successfully!')
             shutil.copyfile(session.attempts[-1].config, f'{input.output}/repaired.config')
+        elif session.status == 'success-maintenance':
+            log.info('Repair process completed, but the kernel boots into maintenance mode.')
+            shutil.copyfile(session.attempts[-1].config, f'{input.output}/repaired.config')
+        else:
+            log.error('Repair process failed. Maximum iterations reached without success.')
 
         return session
     
-    def save_raw_response(self, path, response: dict):
+    def __make_dir(self, path: str):
+        if os.path.exists(path):
+            shutil.rmtree(path)
+
+        os.makedirs(path, exist_ok=True)
+    
+    def __inital_attempt(self, kernel: Kernel, session: Session) -> Attempt:
+
+        log.info('Checking input configuration bootability...')
+
+        dir = f'{session.dir}/attempt_0'
+        self.__make_dir(dir)
+
+        attempt = Attempt(
+            id=0,
+            dir=dir,
+            config=session.base,
+        )
+
+        # Load config
+        if not kernel.load_config(session.base):
+            return attempt
+        
+        # Build
+        attempt.build_log = f'{dir}/build.log'
+        if not kernel.build(attempt.build_log):
+            log.info('Build failed with the input configuration.')
+            return attempt
+        
+        # Boot
+        attempt.boot_log = f'{dir}/boot.log'
+        attempt.boot_succeeded = kernel.boot(attempt.boot_log)
+
+        if attempt.boot_succeeded == 'yes':
+            log.info('Input configuration boots successfully. No repair needed.')
+        elif attempt.boot_succeeded == 'maintenance':
+            log.info('Input configuration boots into maintenance mode.')
+        else:
+            log.info('Input configuration failed to boot.')
+
+        return attempt
+
+    def __attempt(self, llm: BaseChatModel, kernel: Kernel, session: Session):
+
+        dir = f'{session.dir}/attempt_{len(session.attempts)}'
+        self.__make_dir(dir)
+
+        attempt = Attempt(
+            id=len(session.attempts),
+            dir=dir,
+        )
+
+        session.attempts.append(attempt)
+
+        # Agent
+        tools = get_agent_tools(session)
+        agent = create_agent(llm, response_format=AgentResponse, tools=tools)
+
+        response = agent.invoke({ 'messages': prompt.prompt(session) })
+
+        token_usage = self.__extract_token_usage(response)
+        attempt.token_usage = token_usage
+        
+        self.__save_raw_response(f'{dir}/raw-agent-response.json', response)
+
+        # Apply Changes
+        agent_response = response.get('structured_response', None)
+
+        if agent_response is None:
+            log.error('Agent failed to provide a structured response. Skipping attempt.')
+            return
+        
+        attempt.response = agent_response
+        
+        if not kernel.load_config(session.base):
+            return
+        
+        attempt.klocalizer_log = f'{dir}/klocalizer.log'
+        if not kernel.run_klocalizer(attempt.klocalizer_log, agent_response.define, agent_response.undefine):
+            return
+        
+        attempt.klocalizer_succeeded = True
+        attempt.config = f'{dir}/modified.config'
+
+        shutil.copyfile(f'{kernel.src}/.config', attempt.config)
+
+        # Build and Boot Test
+        attempt.build_log = f'{dir}/build.log'
+        if not kernel.build(attempt.build_log):
+            return
+        
+        attempt.build_succeeded = True
+
+        attempt.boot_log = f'{dir}/boot.log'
+        attempt.boot_succeeded = kernel.boot(attempt.boot_log)
+        
+    def __extract_token_usage(self, response: dict) -> TokenUsage:
+        
+        messages = response.get('messages', [])
+
+        ai_messages = [msg for msg in messages if msg.type == 'ai']
+
+        input_tokens = sum(msg.usage_metadata['input_tokens'] for msg in ai_messages if msg.usage_metadata)
+        output_tokens = sum(msg.usage_metadata['output_tokens'] for msg in ai_messages if msg.usage_metadata)
+        total_tokens = sum(msg.usage_metadata['total_tokens'] for msg in ai_messages if msg.usage_metadata)
+
+        return TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens, total_tokens=total_tokens)
+
+    def __save_raw_response(self, path, response: dict):
         with file_lock:
             with open(path, 'w') as f:
                 def default(o):
@@ -78,45 +170,4 @@ class Agent:
                     return str(o)
                 json.dump(response, f, indent=4, default=default)
     
-    def run_klocalizer(self, session: Session, kernel: Kernel, define: list[str], undefine: list[str]) -> bool:
-
-        session.attempts[-1].klocalizer_log = f'{session.attempts[-1].dir}/klocalizer.log'
-        if not kernel.run_klocalizer(session.attempts[-1].klocalizer_log, define, undefine):
-            log.info('KLocalizer failed to run with the given configuration changes.')
-            return False
-        
-        session.attempts[-1].klocalizer_succeeded = True
-        session.attempts[-1].config = f'{session.attempts[-1].dir}/modified.config'
-        shutil.copyfile(f'{kernel.src}/.config', session.attempts[-1].config)
-
-        return True
-
-    def verify(self, kernel: Kernel, session: Session) -> bool:
-
-        if not session.attempts[-1].klocalizer_succeeded:
-            log.info('Skipping verification since KLocalizer did not succeed in the last attempt.')
-            return False
-        
-        if not kernel.load_config(session.latest):
-            log.info('Failed to load latest configuration for verification.')
-            return False            
-        
-        session.attempts[-1].build_log = f'{session.attempts[-1].dir}/build.log'
-        if not kernel.build(session.attempts[-1].build_log):
-            log.info('Build failed with the given configuration changes.')
-            return False
-
-        session.attempts[-1].build_succeeded = True
-        
-        session.attempts[-1].boot_log = f'{session.attempts[-1].dir}/boot.log'
-        if not kernel.boot(session.attempts[-1].boot_log):
-            log.info('Boot failed with the given configuration changes.')
-            return False
-        
-        session.attempts[-1].boot_succeeded = True
-        
-        log.info('Modified configuration boots successfully.')
-
-        return True
-
 agent = Agent()

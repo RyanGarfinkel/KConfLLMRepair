@@ -52,6 +52,15 @@ class AgentSettings(BaseModel):
             return 'openai'
         else:
             raise ValueError(f'Unknown model provider for model: {self.MODEL}')
+        
+    @property
+    def EMBEDDING_MODEL(self) -> str:
+        if self.PROVIDER == 'google':
+            return 'gemini-embedding-001'
+        elif self.PROVIDER == 'openai':
+            return 'text-embedding-3-small'
+        else:
+            raise ValueError(f'Unknown embedding model for provider: {self.PROVIDER}')
 
     MAX_ITERATIONS: int = Field(default=5, ge=1)
     MAX_MATCHES: int = 5

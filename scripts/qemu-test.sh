@@ -47,7 +47,7 @@ for i in $(seq 1 $TIMEOUT); do
         echo '[SUCCESS] Boot successful! Emergency maintenance prompt detected.'
         kill $PID 2>/dev/null || true
         cd "$WORKING_DIR"
-        exit 0
+        exit 2
     fi
     sleep 1
 done
