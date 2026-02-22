@@ -1,76 +1,48 @@
-
 from pydantic import BaseModel, Field
-from .response import AgentResponse
+from .analyze import AnalyzeResult
+from .verify import VerifyResult
+from .apply import ApplyResult
+from .token import TokenUsage
 from typing import Literal
-
-class TokenUsage(BaseModel):
-    input_tokens: int = Field(..., frozen=True)
-    output_tokens: int = Field(..., frozen=True)
-    total_tokens: int = Field(..., frozen=True)
-
-    def model_dump(self) -> dict:
-        return {
-            'input_tokens': self.input_tokens,
-            'output_tokens': self.output_tokens,
-            'total_tokens': self.total_tokens,
-        }
-
-class ToolCall(BaseModel):
-    name: str = Field(..., frozen=True)
-    args: dict = Field(..., frozen=True)
-    response: str | list[str] | dict = Field(..., frozen=True)
-    token_usage: TokenUsage = Field(default=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0))
-
-    def model_dump(self) -> dict:
-        return {
-            'name': self.name,
-            'args': self.args,
-            'response': self.response,
-            'token_usage': self.token_usage.model_dump(),
-        }
 
 class Attempt(BaseModel):
 
     id: int = Field(..., frozen=True)
-
-    config: str | None = Field(default=None)
     dir: str = Field(..., frozen=True)
 
-    klocalizer_succeeded: bool = Field(default=False)
-    klocalizer_log: str | None = Field(default=None)
+    @property
+    def status(self) -> Literal['IN_PROGRESS', 'BUILD_FAILED', 'BOOT_FAILED', 'BOOT_MAINTENANCE', 'BOOT_SUCCEEDED', 'ERROR']:
+        if self.verify.status == 'NOT_STARTED':
+            return 'IN_PROGRESS'
+        elif not self.verify.build_succeeded:
+            return 'BUILD_FAILED'
+        elif self.verify.boot_status == 'no':
+            return 'BOOT_FAILED'
+        elif self.verify.boot_status == 'maintenance':
+            return 'BOOT_MAINTENANCE'
+        elif self.verify.boot_status == 'yes':
+            return 'BOOT_SUCCEEDED'
+        else:
+            return 'ERROR'
 
-    build_succeeded: bool = Field(default=False)
-    build_log: str | None = Field(default=None)
+    analyze: AnalyzeResult = Field(default_factory=AnalyzeResult)
+    apply: ApplyResult = Field(default_factory=ApplyResult)
+    verify: VerifyResult = Field(default_factory=VerifyResult)
 
-    boot_succeeded: Literal['yes', 'maintenance', 'no'] = Field(default='no')
-    boot_log: str | None = Field(default=None)
-
-    tool_calls: list[ToolCall] = Field(default_factory=list)
-    response: AgentResponse | None = Field(default=None)
-    
-    embedding_usage: TokenUsage = Field(default=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0))
-    token_usage: TokenUsage = Field(default=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0))
+    @property
+    def token_usage(self) -> TokenUsage:
+        return TokenUsage(
+            input_tokens=self.analyze.token_usage.input_tokens + self.apply.token_usage.input_tokens,
+            output_tokens=self.analyze.token_usage.output_tokens + self.apply.token_usage.output_tokens,
+            total_tokens=self.analyze.token_usage.total_tokens + self.apply.token_usage.total_tokens,
+        )
 
     def model_dump(self) -> dict:
-        total_tool_call_tokens = sum(call.token_usage.total_tokens for call in self.tool_calls)
         return {
             'attempt': self.id,
-            'summary': {
-                'klocalizer_succeeded': self.klocalizer_succeeded,
-                'klocalizer_log': self.klocalizer_log,
-                'modified_config': self.config,
-                'build_succeeded': self.build_succeeded,
-                'build_log': self.build_log,
-                'boot_succeeded': self.boot_succeeded,
-                'boot_log': self.boot_log,
-                'total_token_usage': self.token_usage.total_tokens + self.embedding_usage.total_tokens + total_tool_call_tokens,
-            },
+            'status': self.status,
             'token_usage': self.token_usage.model_dump(),
-            'embedding_usage': self.embedding_usage.model_dump(),
-            'tool_calls': [call.model_dump() for call in self.tool_calls],
-            'changes': {
-                'define': self.response.define if self.response else None,
-                'undefine': self.response.undefine if self.response else None,
-                'reason': self.response.reasoning if self.response else None,
-            }
+            'analyze': self.analyze.model_dump(),
+            'apply': self.apply.model_dump(),
+            'verify': self.verify.model_dump(),
         }

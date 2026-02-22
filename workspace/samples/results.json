@@ -1,22 +1,22 @@
 {
     "summary": {
         "n": 1,
-        "successes": 1,
-        "failures": 0,
+        "successes": 0,
+        "failures": 1,
         "input_worked": 0,
-        "avg_attempts": 8.0,
-        "avg_edit_distance": 5429.0
+        "avg_attempts": 21.0,
+        "avg_edit_distance": -1
     },
     "token_usage": {
-        "input_tokens": 24102,
-        "output_tokens": 1078,
-        "total_tokens": 25180
+        "input_tokens": 139154,
+        "output_tokens": 9645,
+        "total_tokens": 148799
     },
     "samples": [
         {
-            "status": "Success",
-            "attempts": 8,
-            "edit_distance": 5429
+            "status": "max-attempts-reached",
+            "attempts": 21,
+            "edit_distance": -1
         }
     ]
 }

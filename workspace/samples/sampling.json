@@ -1,18 +1,18 @@
 {
     "summary": {
-        "kernel_version": "6.19.0-rc7",
-        "end_commit": "615aad0f61e0c7a898184a394dc895c610100d4f",
-        "end_commit_date": "2026-01-26T23:54:04+00:00",
+        "kernel_version": "6.19.0",
+        "end_commit": "05f7e89ab9731565d8a62e3b5d1ec206485eeb0b",
+        "end_commit_date": "2026-02-08T13:03:27-08:00",
         "n": 1
     },
     "samples": [
         {
             "config": "/home/ryang/KConfLLMRepair/workspace/samples/sample_0/.config",
             "sample_dir": "/home/ryang/KConfLLMRepair/workspace/samples/sample_0",
-            "kernel_src": "/home/ryang/KConfLLMRepair/src/../workspace/worktrees/615aad0f61_0",
-            "kernel_version": "6.19.0-rc7",
-            "end_commit": "615aad0f61e0c7a898184a394dc895c610100d4f",
-            "end_commit_date": "2026-01-26T23:54:04+00:00"
+            "kernel_src": "/home/ryang/KConfLLMRepair/src/../workspace/worktrees/05f7e89ab9_4",
+            "kernel_version": "6.19.0",
+            "end_commit": "05f7e89ab9731565d8a62e3b5d1ec206485eeb0b",
+            "end_commit_date": "2026-02-08T13:03:27-08:00"
         }
     ]
 }

@@ -4,7 +4,39 @@ from .search import LogSearch
 from .session import Session
 import os
 
-def search_config(path: str, options: list[str]) -> str:
+def grep(path: str, pattern: str) -> list[str]:
+    
+    if not os.path.exists(path):
+        return [f'{path} does not exist.']
+
+    results = []
+
+    with open(path, 'r', errors='replace') as f:
+        for i, line in enumerate(f):
+            if pattern in line:
+                results.append(f'{i + 1}:{line.strip()}')
+    
+    return results
+
+def chunk(path: str, line: int) -> list[str]:
+
+    if not os.path.exists(path):
+        return [f'{path} does not exist.']
+
+    results = []
+    start = max(0, line - 15)
+    end = line + 15
+
+    with open(path, 'r', errors='replace') as f:
+        for i, line in enumerate(f):
+            if i >= start and i <= end:
+                results.append(f'{i + 1}:{line.strip()}')
+            elif i > end:
+                break
+    
+    return results
+
+def search_config(path: str, options: list[str]) -> list[str]:
 
     if not os.path.exists(path):
             return [f'{path} does not exist.']
@@ -28,7 +60,7 @@ def search_config(path: str, options: list[str]) -> str:
         else:
             results.append(f'{option} not found in config.')
 
-    return '\n'.join(results)
+    return results
 
 def get_agent_tools(session: Session) -> list[StructuredTool]:
 

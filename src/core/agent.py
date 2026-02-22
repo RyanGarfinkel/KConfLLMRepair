@@ -1,4 +1,4 @@
-from src.models import Input, AgentResponse, Attempt, ToolCall, TokenUsage
+from src.models import Input, AgentResponse, Attempt, ToolCall, TokenUsage, AnalyzeAgentResult
 from src.agent import get_agent_tools, Session, prompt, model
 from langchain_core.language_models import BaseChatModel
 from singleton_decorator import singleton
@@ -159,6 +159,15 @@ class Agent:
 
         return TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens, total_tokens=total_tokens)
 
+    def __analyze(self, session: Session):
+
+        tools = get_analyze_tools(session)
+        llm = model.get_llm()
+
+        agent = create_agent(llm, response_format=AnalyzeAgentResult, tools=tools)
+
+        
+    
     def __save_raw_response(self, path, response: dict):
         with file_lock:
             with open(path, 'w') as f:
