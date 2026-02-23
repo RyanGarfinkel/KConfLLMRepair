@@ -40,29 +40,31 @@ def repair_callback(session: Session):
     comleted_sessions.append(session)
 
     n = len(comleted_sessions)
-    successes = [s for s in comleted_sessions if s.status == 'Success']
+    successes = [s for s in comleted_sessions if s.status in ['success', 'success-maintenance']]
 
     with file_lock:
         with open(f'{settings.runtime.SAMPLE_DIR}/results.json', 'w') as f:
             json.dump({
                 'summary': {
                     'n': n,
-                    'successes': len([s for s in comleted_sessions if s.status == 'Success']),
-                    'failures': len([s for s in comleted_sessions if s.status != 'Success']),
-                    'input_worked': len([s for s in comleted_sessions if len(s.attempts) == 1 and s.status == 'Success']),
+                    'successes': len([s for s in comleted_sessions if s.status == 'success']),
+                    'maintenance': len([s for s in comleted_sessions if s.status == 'success-maintenance']),
+                    'failures': len([s for s in comleted_sessions if s.status == 'failed']),
+                    'initial_input_worked': len([s for s in comleted_sessions if len(s.attempts) == 1 and s.status == 'success']),
                     'avg_attempts': sum(len(s.attempts) for s in comleted_sessions) / n if n > 0 else -1,
                     'avg_edit_distance': sum(s.edits[1] for s in successes) / len(successes) if len(successes) > 0 else -1
                 },
                 'token_usage': {
-                    'input_tokens': sum(s.attempts[-1].token_usage.input_tokens for s in comleted_sessions),
-                    'output_tokens': sum(s.attempts[-1].token_usage.output_tokens for s in comleted_sessions),
-                    'total_tokens': sum(s.attempts[-1].token_usage.total_tokens for s in comleted_sessions),
+                    'input_tokens': sum(s.token_usage.input_tokens for s in comleted_sessions),
+                    'output_tokens': sum(s.token_usage.output_tokens for s in comleted_sessions),
+                    'total_tokens': sum(s.token_usage.total_tokens for s in comleted_sessions),
                 },
                 'samples': [
                     {
                         'status': s.status,
                         'attempts': len(s.attempts),
                         'edit_distance': s.edits[1] if s.edits else -1,
+                        'token_usage': s.token_usage.model_dump(),
                     } for s in comleted_sessions
                 ]
             }, f, indent=4)

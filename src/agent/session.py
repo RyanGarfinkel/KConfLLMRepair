@@ -38,6 +38,14 @@ class Session:
         return 'in-progress'
     
     @property
+    def token_usage(self) -> TokenUsage:
+        return TokenUsage(
+            input_tokens=sum(a.token_usage.input_tokens for a in self.attempts),
+            output_tokens=sum(a.token_usage.output_tokens for a in self.attempts),
+            total_tokens=sum(a.token_usage.total_tokens for a in self.attempts),
+        )
+
+    @property
     def edits(self) -> Tuple[list[str], int] | None:
         if self.status not in ['success', 'success-maintenance'] or not self.latest:
             return [], -1
@@ -56,12 +64,6 @@ class Session:
         if repaired_config is None:
             repaired_config = maitence_config
 
-        token_usage = TokenUsage(
-            input_tokens=sum(attempt.token_usage.input_tokens for attempt in self.attempts),
-            output_tokens=sum(attempt.token_usage.output_tokens for attempt in self.attempts),
-            total_tokens=sum(attempt.token_usage.total_tokens for attempt in self.attempts)
-        )
-
         edits, edit_distance = self.edits
 
         return {
@@ -72,7 +74,7 @@ class Session:
                 'repaired_config': repaired_config,
                 'edit_distance': edit_distance
             },
-            'token_usage': token_usage.model_dump(),
+            'token_usage': self.token_usage.model_dump(),
             'attempts': [attempt.model_dump() for attempt in self.attempts],
             'edits': edits
         }
