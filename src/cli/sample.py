@@ -5,6 +5,7 @@ from src.utils import file_lock
 from src.models import Sample
 from typing import Callable
 from src.core import Kernel
+import random
 import shutil
 import click
 import json
@@ -26,6 +27,7 @@ def sample_commits(n: int) -> tuple[dict, list[Sample]]:
     samples = [
         Sample(
             sample_dir=f'{settings.runtime.SAMPLE_DIR}/sample_{i}',
+            seed=random.randint(1, 100000000),
             kernel_src='',
             kernel_version='',
             end_commit=main_repo.head.commit.hexsha,
@@ -47,7 +49,7 @@ def make_sample(sample: Sample, kernel: Kernel) -> bool:
     os.makedirs(sample_dir, exist_ok=True)
 
     path = f'{sample_dir}/.config'
-    if not kernel.make_rand_config(path):
+    if not kernel.make_rand_config(path, sample.seed):
         return False
     
     sample.config = path

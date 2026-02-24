@@ -6,9 +6,9 @@ import subprocess
 @singleton
 class RandConfig:
 
-    def make(self, kernel_src: str, output: str) -> bool:
+    def make(self, kernel_src: str, output: str, seed: int) -> bool:
 
-        cmd = ['bash', settings.scripts.RAND_CONFIG_SCRIPT, kernel_src, output]
+        cmd = ['bash', settings.scripts.RAND_CONFIG_SCRIPT, kernel_src, output, str(seed)]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:

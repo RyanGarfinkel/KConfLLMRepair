@@ -64,11 +64,11 @@ class Kernel:
 
         return True
     
-    def make_rand_config(self, path: str) -> bool:
+    def make_rand_config(self, path: str, seed: int) -> bool:
 
         log.info('Generating random configuration...')
 
-        if not randconfig.make(self.src, path):
+        if not randconfig.make(self.src, path, seed):
             log.error('Randconfig failed to generate a base configuration.')
             return False
         
