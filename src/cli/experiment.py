@@ -49,7 +49,7 @@ def repair_callback(session: Session):
                     'n': n,
                     'successes': len([s for s in comleted_sessions if s.status == 'success']),
                     'maintenance': len([s for s in comleted_sessions if s.status == 'success-maintenance']),
-                    'failures': len([s for s in comleted_sessions if s.status == 'failed']),
+                    'failures': len([s for s in comleted_sessions if s.status == 'max-attempts-reached']),
                     'initial_input_worked': len([s for s in comleted_sessions if len(s.attempts) == 1 and s.status == 'success']),
                     'avg_attempts': sum(len(s.attempts) for s in comleted_sessions) / n if n > 0 else -1,
                     'avg_edit_distance': sum(s.edits[1] for s in successes) / len(successes) if len(successes) > 0 else -1
