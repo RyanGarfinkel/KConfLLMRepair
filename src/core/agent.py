@@ -1,4 +1,5 @@
-from src.models import Input, AgentResponse, Attempt, ToolCall, TokenUsage
+from src.models import Input, AgentResponse, Attempt, TokenUsage
+from langchain.agents.middleware import ToolCallLimitMiddleware
 from src.agent import get_agent_tools, Session, prompt, model
 from langchain_core.language_models import BaseChatModel
 from singleton_decorator import singleton
@@ -107,7 +108,7 @@ class Agent:
 
         # Agent
         tools = get_agent_tools(session)
-        agent = create_agent(llm, response_format=AgentResponse, tools=tools)
+        agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=ToolCallLimitMiddleware(run_limit=10))
 
         response = agent.invoke({ 'messages': prompt.prompt(session) })
 
