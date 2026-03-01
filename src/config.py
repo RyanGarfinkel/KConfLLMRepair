@@ -28,6 +28,7 @@ class RuntimeSettings(BaseModel):
     JOBS: int = Field(default=8, ge=1)
     CHUNK_WINDOW: int = 20
     CLEANUP: bool = Field(default=False)
+    USE_RAG: bool = Field(default=False)
 
     SAMPLE_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
 
@@ -63,6 +64,7 @@ class AgentSettings(BaseModel):
             raise ValueError(f'Unknown embedding model for provider: {self.PROVIDER}')
 
     MAX_ITERATIONS: int = Field(default=5, ge=1)
+    MAX_TOOL_CALLS: int = Field(default=10, ge=1)
     MAX_MATCHES: int = 5
 
     @model_validator(mode='after')

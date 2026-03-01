@@ -1,6 +1,6 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from src.models import TokenUsage
+from src.models import LLMUsage
 from src.config import settings
 from typing import Literal
 from .model import model
@@ -119,13 +119,13 @@ class LogSearch:
     def __cosine_similarity(self, a: list[float], b: list[float]) -> float:
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-    def query(self, query: str) -> tuple[str, TokenUsage]:
+    def query(self, query: str) -> tuple[str, LLMUsage]:
 
         if self.path is None or not os.path.exists(self.path):
-            return 'File does not exist', TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
+            return 'File does not exist', LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0)
         
         query_embedding, tokens = self.model.embed(query, task_type='RETRIEVAL_QUERY')
-        token_usage = TokenUsage(input_tokens=tokens, output_tokens=0, total_tokens=tokens)
+        token_usage = LLMUsage(input_tokens=tokens, output_tokens=0, total_tokens=tokens)
 
         scores = [self.__cosine_similarity(query_embedding[0], chunk_embedding) for chunk_embedding in self.embeddings]
 

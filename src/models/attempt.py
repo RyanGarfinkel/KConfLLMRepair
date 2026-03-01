@@ -1,25 +1,14 @@
 
 from pydantic import BaseModel, Field
 from .response import AgentResponse
+from .token import LLMUsage
 from typing import Literal
-
-class TokenUsage(BaseModel):
-    input_tokens: int = Field(..., frozen=True)
-    output_tokens: int = Field(..., frozen=True)
-    total_tokens: int = Field(..., frozen=True)
-
-    def model_dump(self) -> dict:
-        return {
-            'input_tokens': self.input_tokens,
-            'output_tokens': self.output_tokens,
-            'total_tokens': self.total_tokens,
-        }
 
 class ToolCall(BaseModel):
     name: str = Field(..., frozen=True)
     args: dict = Field(..., frozen=True)
     response: str | list[str] | dict = Field(..., frozen=True)
-    token_usage: TokenUsage = Field(default=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0))
+    token_usage: LLMUsage = Field(default=LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0))
 
     def model_dump(self) -> dict:
         return {
@@ -48,8 +37,8 @@ class Attempt(BaseModel):
     tool_calls: list[ToolCall] = Field(default_factory=list)
     response: AgentResponse | None = Field(default=None)
     
-    embedding_usage: TokenUsage = Field(default=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0))
-    token_usage: TokenUsage = Field(default=TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0))
+    embedding_usage: LLMUsage = Field(default=LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0))
+    token_usage: LLMUsage = Field(default=LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0))
 
     def model_dump(self) -> dict:
         total_tool_call_tokens = sum(call.token_usage.total_tokens for call in self.tool_calls)
