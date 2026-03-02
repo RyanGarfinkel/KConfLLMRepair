@@ -1,6 +1,6 @@
-from src.models import Input, AgentResponse, Attempt, TokenUsage
+from src.models import Input, AgentResponse, Attempt, LLMUsage
 from langchain.agents.middleware import ToolCallLimitMiddleware
-from src.agent import get_agent_tools, Session, prompt, model
+from src.agent import agent_tools, Session, prompt, model
 from langchain_core.language_models import BaseChatModel
 from singleton_decorator import singleton
 from langchain.agents import create_agent
@@ -14,6 +14,9 @@ import os
 
 @singleton
 class Agent:
+
+    def __init__(self):
+        self.middleware = [ToolCallLimitMiddleware(run_limit=settings.agent.MAX_TOOL_CALLS)]
 
     def repair(self, input: Input, kernel: Kernel) -> Session:
         
@@ -107,8 +110,8 @@ class Agent:
         session.attempts.append(attempt)
 
         # Agent
-        tools = get_agent_tools(session)
-        agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=ToolCallLimitMiddleware(run_limit=10))
+        tools = agent_tools.get(session)
+        agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
 
         response = agent.invoke({ 'messages': prompt.prompt(session) })
 
@@ -130,10 +133,9 @@ class Agent:
             return
         
         attempt.klocalizer_log = f'{dir}/klocalizer.log'
-        if not kernel.run_klocalizer(attempt.klocalizer_log, agent_response.define, agent_response.undefine):
+        attempt.klocalizer_status = kernel.run_klocalizer(attempt.klocalizer_log, agent_response.define, agent_response.undefine)
+        if attempt.klocalizer_status != 'success':
             return
-        
-        attempt.klocalizer_succeeded = True
         attempt.config = f'{dir}/modified.config'
 
         shutil.copyfile(f'{kernel.src}/.config', attempt.config)
@@ -148,7 +150,7 @@ class Agent:
         attempt.boot_log = f'{dir}/boot.log'
         attempt.boot_succeeded = kernel.boot(attempt.boot_log)
         
-    def __extract_token_usage(self, response: dict) -> TokenUsage:
+    def __extract_token_usage(self, response: dict) -> LLMUsage:
         
         messages = response.get('messages', [])
 
@@ -158,7 +160,7 @@ class Agent:
         output_tokens = sum(msg.usage_metadata['output_tokens'] for msg in ai_messages if msg.usage_metadata)
         total_tokens = sum(msg.usage_metadata['total_tokens'] for msg in ai_messages if msg.usage_metadata)
 
-        return TokenUsage(input_tokens=input_tokens, output_tokens=output_tokens, total_tokens=total_tokens)
+        return LLMUsage(input_tokens=input_tokens, output_tokens=output_tokens, total_tokens=total_tokens)
 
     def __save_raw_response(self, path, response: dict):
         with file_lock:

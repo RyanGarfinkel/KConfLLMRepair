@@ -1,22 +1,8 @@
-
+from .token import LLMUsage, EmbeddingUsage
 from pydantic import BaseModel, Field
 from .response import AgentResponse
-from .token import LLMUsage
+from .tool import ToolCall
 from typing import Literal
-
-class ToolCall(BaseModel):
-    name: str = Field(..., frozen=True)
-    args: dict = Field(..., frozen=True)
-    response: str | list[str] | dict = Field(..., frozen=True)
-    token_usage: LLMUsage = Field(default=LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0))
-
-    def model_dump(self) -> dict:
-        return {
-            'name': self.name,
-            'args': self.args,
-            'response': self.response,
-            'token_usage': self.token_usage.model_dump(),
-        }
 
 class Attempt(BaseModel):
 
@@ -25,7 +11,7 @@ class Attempt(BaseModel):
     config: str | None = Field(default=None)
     dir: str = Field(..., frozen=True)
 
-    klocalizer_succeeded: bool = Field(default=False)
+    klocalizer_status: Literal['success', 'no-satisfying-constraints', 'error', 'not-run'] = Field(default='not-run')
     klocalizer_log: str | None = Field(default=None)
 
     build_succeeded: bool = Field(default=False)
@@ -37,7 +23,7 @@ class Attempt(BaseModel):
     tool_calls: list[ToolCall] = Field(default_factory=list)
     response: AgentResponse | None = Field(default=None)
     
-    embedding_usage: LLMUsage = Field(default=LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0))
+    embedding_usage: EmbeddingUsage = Field(default_factory=EmbeddingUsage)
     token_usage: LLMUsage = Field(default=LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0))
 
     def model_dump(self) -> dict:
@@ -45,7 +31,7 @@ class Attempt(BaseModel):
         return {
             'attempt': self.id,
             'summary': {
-                'klocalizer_succeeded': self.klocalizer_succeeded,
+                'klocalizer_status': self.klocalizer_status,
                 'klocalizer_log': self.klocalizer_log,
                 'modified_config': self.config,
                 'build_succeeded': self.build_succeeded,

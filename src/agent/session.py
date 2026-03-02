@@ -1,10 +1,11 @@
 
-from src.models import Attempt, TokenUsage, EmbeddingUsage
+from src.models import Attempt, LLMUsage, EmbeddingUsage
 from src.tools import diffconfig
 from src.utils import file_lock
 from src.config import settings
 from typing import Tuple
 import json
+
 class Session:
     
     def __init__(self, config: str, output: str):
@@ -38,12 +39,35 @@ class Session:
         return 'in-progress'
     
     @property
-    def token_usage(self) -> TokenUsage:
-        return TokenUsage(
+    def token_usage(self) -> LLMUsage:
+        return LLMUsage(
             input_tokens=sum(a.token_usage.input_tokens for a in self.attempts),
             output_tokens=sum(a.token_usage.output_tokens for a in self.attempts),
             total_tokens=sum(a.token_usage.total_tokens for a in self.attempts),
         )
+
+    @property
+    def embedding_usage(self) -> EmbeddingUsage:
+        return EmbeddingUsage(
+            build_log_tokens=sum(a.embedding_usage.build_log_tokens for a in self.attempts),
+            boot_log_tokens=sum(a.embedding_usage.boot_log_tokens for a in self.attempts),
+        )
+
+    @property
+    def constraints(self) -> dict:
+        if self.status == 'success':
+            attempt = next((a for a in reversed(self.attempts) if a.boot_succeeded == 'yes'), None)
+        elif self.status == 'success-maintenance':
+            attempt = next((a for a in reversed(self.attempts) if a.boot_succeeded == 'maintenance'), None)
+        else:
+            return {'defines': 0, 'undefines': 0, 'total': 0}
+
+        if not attempt or not attempt.response:
+            return {'defines': 0, 'undefines': 0, 'total': 0}
+
+        defines = len(attempt.response.define)
+        undefines = len(attempt.response.undefine)
+        return {'defines': defines, 'undefines': undefines, 'total': defines + undefines}
 
     @property
     def edits(self) -> Tuple[list[str], int] | None:
@@ -72,9 +96,16 @@ class Session:
                 'attempts': len(self.attempts) - 1,
                 'original_config': self.base,
                 'repaired_config': repaired_config,
-                'edit_distance': edit_distance
+                'edit_distance': edit_distance,
+                'total_constraints': self.constraints['total'],
             },
-            'token_usage': self.token_usage.model_dump(),
+            'models': {
+                'llm': settings.agent.MODEL,
+                'embedding': settings.agent.EMBEDDING_MODEL if settings.runtime.USE_RAG else None,
+            },
+            'constraints': self.constraints,
+            'llm_token_usage': self.token_usage.model_dump(),
+            'embedding_token_usage': self.embedding_usage.model_dump(),
             'attempts': [attempt.model_dump() for attempt in self.attempts],
             'edits': edits
         }
