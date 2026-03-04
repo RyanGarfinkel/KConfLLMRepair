@@ -64,7 +64,7 @@ class AgentSettings(BaseModel):
             raise ValueError(f'Unknown embedding model for provider: {self.PROVIDER}')
 
     MAX_ITERATIONS: int = Field(default=5, ge=1)
-    MAX_TOOL_CALLS: int = Field(default=10, ge=1)
+    MAX_TOOL_CALLS: int = Field(default=20, ge=1)
     MAX_MATCHES: int = 5
 
     @model_validator(mode='after')

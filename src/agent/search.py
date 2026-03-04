@@ -1,5 +1,6 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
+from src.utils import embedding_lock
 from src.config import settings
 from typing import Literal
 from .model import model
@@ -69,7 +70,8 @@ class LogSearch:
         self.model = model.get_embedding_model()
         self.token_usage = 0
 
-        self.__load()
+        with embedding_lock:
+            self.__load()
 
     def __load(self):
         
@@ -102,7 +104,8 @@ class LogSearch:
         if self.path is None or not os.path.exists(self.path):
             return 'File does not exist', 0
 
-        query_embedding, tokens = self.model.embed(query, task_type='RETRIEVAL_QUERY')
+        with embedding_lock:
+            query_embedding, tokens = self.model.embed(query, task_type='RETRIEVAL_QUERY')
 
         scores = [self.__cosine_similarity(query_embedding[0], chunk_embedding) for chunk_embedding in self.embeddings]
 

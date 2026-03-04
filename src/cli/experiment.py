@@ -71,8 +71,8 @@ def repair_callback(i: int, session: Session):
                 },
                 'embedding_token_usage': {
                     'model': settings.agent.EMBEDDING_MODEL if settings.runtime.USE_RAG else None,
-                    'input_tokens': sum(s.embedding_usage.input_tokens for s in sessions),
-                    'output_tokens': sum(s.embedding_usage.output_tokens for s in sessions),
+                    'build_log_tokens': sum(s.embedding_usage.build_log_tokens for s in sessions),
+                    'boot_log_tokens': sum(s.embedding_usage.boot_log_tokens for s in sessions),
                     'total_tokens': sum(s.embedding_usage.total_tokens for s in sessions),
                 },
                 'samples': [

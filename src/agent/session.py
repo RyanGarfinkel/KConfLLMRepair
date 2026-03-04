@@ -29,9 +29,11 @@ class Session:
         if attempts == 0:
             return 'initialized'
         
+        any_maintenance = any(a.boot_succeeded == 'maintenance' for a in self.attempts)
+        
         if self.attempts[-1].boot_succeeded == 'yes':
             return 'success'
-        elif self.attempts[-1].boot_succeeded == 'maintenance' and attempts >= settings.agent.MAX_ITERATIONS:
+        elif any_maintenance and attempts >= settings.agent.MAX_ITERATIONS:
             return 'success-maintenance'
         elif attempts >= settings.agent.MAX_ITERATIONS:
             return 'max-attempts-reached'
