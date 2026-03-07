@@ -13,6 +13,7 @@ Core:
 - [x] Make src property in Kernel?
 - [x] Make src.scripts -> src.cli
 - [ ] Reintroduce repair with patch files (original + patch + modified -> KBootRepair)
+- [ ] Cross compile
 
 Sample Generation/Repair:
 - [x] Move base config to sample directory
