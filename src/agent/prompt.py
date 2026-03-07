@@ -10,6 +10,17 @@ class Prompt:
     
     @property
     def system(self) -> SystemMessage:
+
+        if settings.runtime.USE_RAG:
+            log_instruction = (
+                "Use semantic search queries to retrieve relevant sections of each log. "
+                "Queries should describe what you are looking for in terms of meaning and context, "
+                "not keywords or patterns. Describe the failure mode, compiler behavior, or kernel "
+                "subsystem involved rather than quoting log text directly."
+            )
+        else:
+            log_instruction = "Use grep to search logs by pattern, and chunk to retrieve lines around a specific line number."
+
         return SystemMessage(content=f"""
             ROLE: You are an expert Linux kernel configuration agent tasked with repairing a non-booting kernel configuration.
             You specialize in reading and understanding build and boot logs, and are knowledgeable about how different configuration
@@ -18,7 +29,7 @@ class Prompt:
             1. You will be given access to query the build and boot logs of the previous attempt, depending on availability.
             If the latest klocalizer attempt did not succeed, the build and boot logs will be unavailable. If the latest build
             attempt failed, the boot log will be unavailable. If the latest boot attempt failed, all logs will be available.
-            {"Use semantic search queries to retrieve relevant sections of each log." if settings.runtime.USE_RAG else "Use grep to search logs by pattern, and chunk to retrieve lines around a specific line number."}
+            {log_instruction}
             2. You will also have access to the original and latest (if not the first attempt) configuration files. Search these
             to understand the options likely causing the failure. You may query multiple options at once, but be mindful that you
             have a limit of {settings.agent.MAX_TOOL_CALLS} tool calls per attempt. Reserve at least one call for your final
