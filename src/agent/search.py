@@ -1,27 +1,11 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from src.models import TokenUsage
+from src.utils import embedding_lock
 from src.config import settings
 from typing import Literal
 from .model import model
 import numpy as np
 import os
-
-klocalizer_separators =  [
-    '\nTraceback (most recent call last):',
-    '\nERROR:',
-    '\nWARNING: Failed to compute',
-    '\nWARNING: Syntax analysis',
-    '\nINFO: Build with',
-    '\nINFO: Trying',
-    '\nINFO: Computing line',
-    '\nINFO: Sampling and writing',
-    '\n[STEP 1/3]',
-    '\n[STEP 2/3]',
-    '\n[STEP 3/3]',
-    '\nWARNING:',
-    '\nINFO:',
-]
 
 build_separators = [
     '\n',
@@ -64,22 +48,17 @@ qemu_separators = [
 ]
 
 SPLITTER_CONFIGS = {
-    'klocalizer': {'chunk_size': 3000, 'chunk_overlap': 500},
     'build': {'chunk_size': 1500, 'chunk_overlap': 300},
     'qemu':  {'chunk_size': 1200, 'chunk_overlap': 300},
 }
 
 class LogSearch:
 
-    def __init__(self, path: str, type: Literal['klocalizer', 'build', 'boot']):
+    def __init__(self, path: str, type: Literal['build', 'boot']):
 
         self.path = path
 
-        if type == 'klocalizer':
-            self.separators = klocalizer_separators
-            self.chunk_size = SPLITTER_CONFIGS['klocalizer']['chunk_size']
-            self.chunk_overlap = SPLITTER_CONFIGS['klocalizer']['chunk_overlap']
-        elif type == 'build':
+        if type == 'build':
             self.separators = build_separators
             self.chunk_size = SPLITTER_CONFIGS['build']['chunk_size']
             self.chunk_overlap = SPLITTER_CONFIGS['build']['chunk_overlap']
@@ -91,7 +70,8 @@ class LogSearch:
         self.model = model.get_embedding_model()
         self.token_usage = 0
 
-        self.__load()
+        with embedding_lock:
+            self.__load()
 
     def __load(self):
         
@@ -119,13 +99,13 @@ class LogSearch:
     def __cosine_similarity(self, a: list[float], b: list[float]) -> float:
         return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
-    def query(self, query: str) -> tuple[str, TokenUsage]:
+    def query(self, query: str) -> tuple[str, int]:
 
         if self.path is None or not os.path.exists(self.path):
-            return 'File does not exist', TokenUsage(input_tokens=0, output_tokens=0, total_tokens=0)
-        
-        query_embedding, tokens = self.model.embed(query, task_type='RETRIEVAL_QUERY')
-        token_usage = TokenUsage(input_tokens=tokens, output_tokens=0, total_tokens=tokens)
+            return 'File does not exist', 0
+
+        with embedding_lock:
+            query_embedding, tokens = self.model.embed(query, task_type='RETRIEVAL_QUERY')
 
         scores = [self.__cosine_similarity(query_embedding[0], chunk_embedding) for chunk_embedding in self.embeddings]
 
@@ -133,4 +113,4 @@ class LogSearch:
 
         chunks = [chunk for _, chunk in top_matches]
 
-        return '\n'.join(chunks), token_usage
+        return '\n'.join(chunks), tokens

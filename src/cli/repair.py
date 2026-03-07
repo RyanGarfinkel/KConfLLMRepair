@@ -28,7 +28,8 @@ def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Se
 @click.option('--model', '-m', default='gemini-3-pro-preview', help='Model name of you wish to use for repair.')
 @click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
 @click.option('--max-iterations', default=5, help='Maximum number of repair iterations per sample.')
-def main(repair: str, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int):
+@click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
+def main(repair: str, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int, rag: bool):
 
     input = Input(
         config=repair,
@@ -36,6 +37,7 @@ def main(repair: str, output: str | None, src: str | None, model: str, jobs: int
     )
 
     settings.runtime.JOBS = jobs
+    settings.runtime.USE_RAG = rag
     settings.agent.MODEL = model
     settings.agent.MAX_ITERATIONS = max_iterations
 

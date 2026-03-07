@@ -9,7 +9,7 @@ from src.utils import log
 import click
 import json
 
-comleted_sessions = []
+completed_sessions: list[tuple[int, Session]] = []
 
 def read_samples(n: int) -> list[Sample]:
     with open(f'{settings.runtime.SAMPLE_DIR}/sampling.json', 'r') as f:
@@ -34,36 +34,57 @@ def repair_sample(i: int, sample: Sample):
         output=f'{settings.runtime.SAMPLE_DIR}/sample_{i}'
     )
 
-    repair_config(input, sample.kernel_src, repair_callback)
+    repair_config(input, sample.kernel_src, lambda session: repair_callback(i, session))
 
-def repair_callback(session: Session):
-    comleted_sessions.append(session)
+def repair_callback(i: int, session: Session):
+    completed_sessions.append((i, session))
 
-    n = len(comleted_sessions)
-    successes = [s for s in comleted_sessions if s.status == 'Success']
+    sessions = [s for _, s in completed_sessions]
+    n = len(sessions)
+    successes = [s for s in sessions if s.status in ['success', 'success-maintenance']]
+
+    avg_constraints = (
+        sum(s.constraints['total'] for s in successes) / len(successes)
+        if successes else -1
+    )
+
+    sorted_sessions = sorted(completed_sessions, key=lambda t: t[0])
 
     with file_lock:
         with open(f'{settings.runtime.SAMPLE_DIR}/results.json', 'w') as f:
             json.dump({
                 'summary': {
                     'n': n,
-                    'successes': len([s for s in comleted_sessions if s.status == 'Success']),
-                    'failures': len([s for s in comleted_sessions if s.status != 'Success']),
-                    'input_worked': len([s for s in comleted_sessions if len(s.attempts) == 1 and s.status == 'Success']),
-                    'avg_attempts': sum(len(s.attempts) for s in comleted_sessions) / n if n > 0 else -1,
-                    'avg_edit_distance': sum(s.edits[1] for s in successes) / len(successes) if len(successes) > 0 else -1
+                    'successes': len([s for s in sessions if s.status == 'success']),
+                    'maintenance': len([s for s in sessions if s.status == 'success-maintenance']),
+                    'failures': len([s for s in sessions if s.status == 'max-attempts-reached']),
+                    'initial_input_worked': len([s for s in sessions if len(s.attempts) == 1 and s.status == 'success']),
+                    'avg_attempts': sum(len(s.attempts) for s in sessions) / n if n > 0 else -1,
+                    'avg_edit_distance': sum(s.edits[1] for s in successes) / len(successes) if successes else -1,
+                    'avg_constraints': avg_constraints,
                 },
-                'token_usage': {
-                    'input_tokens': sum(s.attempts[-1].token_usage.input_tokens for s in comleted_sessions),
-                    'output_tokens': sum(s.attempts[-1].token_usage.output_tokens for s in comleted_sessions),
-                    'total_tokens': sum(s.attempts[-1].token_usage.total_tokens for s in comleted_sessions),
+                'llm_token_usage': {
+                    'model': settings.agent.MODEL,
+                    'input_tokens': sum(s.token_usage.input_tokens for s in sessions),
+                    'output_tokens': sum(s.token_usage.output_tokens for s in sessions),
+                    'total_tokens': sum(s.token_usage.total_tokens for s in sessions),
+                },
+                'embedding_token_usage': {
+                    'model': settings.agent.EMBEDDING_MODEL if settings.runtime.USE_RAG else None,
+                    'build_log_tokens': sum(s.embedding_usage.build_log_tokens for s in sessions),
+                    'boot_log_tokens': sum(s.embedding_usage.boot_log_tokens for s in sessions),
+                    'total_tokens': sum(s.embedding_usage.total_tokens for s in sessions),
                 },
                 'samples': [
                     {
+                        'sample': idx + 1,
                         'status': s.status,
                         'attempts': len(s.attempts),
                         'edit_distance': s.edits[1] if s.edits else -1,
-                    } for s in comleted_sessions
+                        'constraints': s.constraints,
+                        'llm_token_usage': s.token_usage.model_dump(),
+                        'embedding_token_usage': s.embedding_usage.model_dump(),
+                    } for idx, s in sorted_sessions
                 ]
             }, f, indent=4)
 
@@ -92,13 +113,15 @@ def run_experiment(n: int, skip_generation: bool, skip_repair: bool):
 @click.option('--skip-generation', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
 @click.option('--skip-repair', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
 @click.option('--cleanup', is_flag=True, help='Clean up kernel worktrees after processing samples.')
-def main(n: int, model: str, jobs: int, max_threads: int, max_iterations: int, skip_generation: bool, skip_repair: bool, cleanup: bool):
+@click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
+def main(n: int, model: str, jobs: int, max_threads: int, max_iterations: int, skip_generation: bool, skip_repair: bool, cleanup: bool, rag: bool):
 
     settings.runtime.MAX_THREADS = max_threads
     settings.agent.MODEL = model
     settings.runtime.JOBS = jobs
     settings.agent.MAX_ITERATIONS = max_iterations
     settings.runtime.CLEANUP = cleanup
+    settings.runtime.USE_RAG = rag
 
     run_experiment(n, skip_generation, skip_repair)
 

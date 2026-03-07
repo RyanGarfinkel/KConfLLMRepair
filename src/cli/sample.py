@@ -5,6 +5,7 @@ from src.utils import file_lock
 from src.models import Sample
 from typing import Callable
 from src.core import Kernel
+import random
 import shutil
 import click
 import json
@@ -26,6 +27,7 @@ def sample_commits(n: int) -> tuple[dict, list[Sample]]:
     samples = [
         Sample(
             sample_dir=f'{settings.runtime.SAMPLE_DIR}/sample_{i}',
+            seed=random.randint(1, 100000000),
             kernel_src='',
             kernel_version='',
             end_commit=main_repo.head.commit.hexsha,
@@ -47,7 +49,7 @@ def make_sample(sample: Sample, kernel: Kernel) -> bool:
     os.makedirs(sample_dir, exist_ok=True)
 
     path = f'{sample_dir}/.config'
-    if not kernel.make_rand_config(path):
+    if not kernel.make_rand_config(path, sample.seed):
         return False
     
     sample.config = path
@@ -84,18 +86,19 @@ def generate_samples(n: int, complete_callback: Callable[[int, Sample], None] | 
         completed.append(sample)
         save_samples(summary, completed)
 
-        if not make_sample(sample, kernel):
-            log.error(f'Failed to create sample {i + 1}.')
-            return
-        
-        save_samples(summary, completed)
-            
-        if complete_callback is not None:
-            complete_callback(i, sample)
+        try:
+            if not make_sample(sample, kernel):
+                log.error(f'Failed to create sample {i + 1}.')
+                return
 
-        if settings.runtime.CLEANUP:
-            log.info(f'Cleaning up sample {i + 1} worktree...')
-            worktree.cleanup(sample.kernel_src)
+            save_samples(summary, completed)
+
+            if complete_callback is not None:
+                complete_callback(i, sample)
+        finally:
+            if settings.runtime.CLEANUP:
+                log.info(f'Cleaning up sample {i + 1} worktree...')
+                worktree.cleanup(sample.kernel_src)
         
     tasks = [lambda idx=i: process(idx) for i in range(n)]
     dispatcher.run_tasks(tasks, desc='Generating samples')

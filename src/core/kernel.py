@@ -64,11 +64,11 @@ class Kernel:
 
         return True
     
-    def make_rand_config(self, path: str) -> bool:
+    def make_rand_config(self, path: str, seed: int) -> bool:
 
         log.info('Generating random configuration...')
 
-        if not randconfig.make(self.src, path):
+        if not randconfig.make(self.src, path, seed):
             log.error('Randconfig failed to generate a base configuration.')
             return False
         
@@ -76,21 +76,24 @@ class Kernel:
 
         return True
     
-    def run_klocalizer(self, log_path: str, define: list[str] = [], undefine: list[str] = []) -> bool:
+    def run_klocalizer(self, log_path: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
 
         log.info('Running KLocalizer...')
         
         if not os.path.exists(f'{self.src}/.config'):
             log.error('No .config file found in kernel source. Please load a configuration before running KLocalizer.')
-            return False
+            return 'error'
 
-        if not klocalizer.run(self.src, log_path, define, undefine):
-            log.error('KLocalizer failed to run.')
-            return False
-        
-        log.success('KLocalizer completed successfully.')
+        status = klocalizer.run(self.src, log_path, define, undefine)
 
-        return True
+        if status == 'success':
+            log.success('KLocalizer completed successfully.')
+        elif status == 'no-satisfying-constraints':
+            log.warning('KLocalizer found no satisfying constraints.')
+        else:
+            log.error('KLocalizer failed.')
+
+        return status
     
     def build(self, path: str) -> bool:
         

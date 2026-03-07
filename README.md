@@ -25,23 +25,40 @@ python3 -m src.cli.repair --repair broken.config --src $KERNEL_SRC
 
 ### Repair Options
 
-| Option             | Required?          | Example                         | Description                                                      |
-|--------------------|--------------------|---------------------------------|------------------------------------------------------------------|
-| `--repair`         | :white_check_mark: | `--repair broken.config`        | Path to configuration file to repair.                            |
-| `--output`         | :x:                | `--output workspace/sample`     | Path to log attempts and results. Default is CWD.                |
-| `--src`            | :x:                | `--kernel-src $KERNEL_WORKTREE` | Path to the kernel source code. Default is $KERNEL_SRC variable. |
-| `--model`          | :x:                | `--output workspace/sample_0`   | Model name of you wish to use for repair.                        |
-| `--jobs`           | :x:                | `--jobs 8`                      | Number of jobs to run when building the kernel.                  |
-| `--max-iterations` | :x:                | `--max-iterations 100`          | Maximum number of repair iterations per sample.                  |                              |
+| Option             | Required?          | Example                          | Description                                                       |
+|--------------------|--------------------|----------------------------------|-------------------------------------------------------------------|
+| `--repair`         | :white_check_mark: | `--repair broken.config`         | Path to configuration file to repair.                             |
+| `--output`         | :x:                | `--output workspace/sample`      | Path to log attempts and results. Default is CWD.                 |
+| `--src`            | :x:                | `--src $KERNEL_SRC`              | Path to the kernel source code. Default is $KERNEL_SRC variable.  |
+| `--model`          | :x:                | `--model gemini-3-pro-preview`   | Model to use for repair. Default is `gemini-3-pro-preview`.       |
+| `--jobs`           | :x:                | `--jobs 8`                       | Number of jobs to run when building the kernel. Default is 8.     |
+| `--max-iterations` | :x:                | `--max-iterations 5`             | Maximum number of repair iterations. Default is 5.                |
+| `--rag`            | :x:                | `--rag`                          | Use RAG semantic search tools instead of grep/chunk tools.        |
 
 ### Tools
-| Tool                   | Args                                   | Description                                                |
-|------------------------|----------------------------------------|------------------------------------------------------------|
-| search_original_config | options: list[str]                     | Returns the values of the options from the original config.|
-| search_latest_config   | options: list[str]                     | Returns the values of the options from the latest config.  |
-| search_klocalizer_log  | regex: str                             | Returns pattern matches in the latest klocalizer log.      |
-| search_build_log       | regex: str                             | Returns pattern matches in the latest build log.           |
-| search_boot_log        | regex: str                             | Returns pattern matches in the latest QEMU boot log.       |
+
+The config search tools are always available. The grep/chunk tools are used by default; pass `--rag` to use the RAG tools instead.
+
+| Tool                   | Args              | Description                                                 |
+|------------------------|-------------------|-------------------------------------------------------------|
+| search_original_config | options: list[str]| Returns the values of the options from the original config. |
+| search_latest_config   | options: list[str]| Returns the values of the options from the latest config.   |
+| grep_build_log         | pattern: str      | Returns lines from the build log matching the pattern.      |
+| chunk_build_log        | line: int         | Returns lines from the build log centered around a line.    |
+| grep_boot_log          | pattern: str      | Returns lines from the boot log matching the pattern.       |
+| chunk_boot_log         | line: int         | Returns lines from the boot log centered around a line.     |
+
+<details>
+<summary>RAG Tools</summary>
+
+These tools use embedding-based retrieval to semantically search logs. Passing `--rag` to the repair or experiment script enables them in place of the grep/chunk tools above.
+
+| Tool             | Args        | Description                                               |
+|------------------|-------------|-----------------------------------------------------------|
+| search_build_log | query: str  | Returns relevant chunks from the build log for the query. |
+| search_boot_log  | query: str  | Returns relevant chunks from the boot log for the query.  |
+
+</details>
 
 ### Output Format
 The `boot-agent` directory will be created in the output directory sepecified in the command (or the current working directory). The repaired configuration will be saved in `.config`. Information about the tools used and iteration summaries will be stored in `summary.json`.
@@ -63,39 +80,41 @@ agent-repair-attempts/
 
 See my [Google Drive folder](https://drive.google.com/drive/u/1/folders/1jIB91vHjTCAGMrzhVpkVojy9UwUpXVOz) to see past samples and agent repairs.
 
-### Experiment Script (reccomended)
+### Experiment Script (recommended)
 
-The `experiment.py` script handles sample generation and repair. Once each sample is generated, it will immediatly be passed into the repair process. You may opt to skip generation or repair. It is reccomended you run this script with the `--cleanup` flag to avoid having multiple worktrees at the end of this process.
+The `experiment.py` script handles sample generation and repair. Once each sample is generated, it will immediately be passed into the repair process. You may opt to skip generation or repair. It is recommended you run this script with the `--cleanup` flag to avoid leaving multiple worktrees behind.
 
 ```bash
 python3 -m src.cli.experiment -n 25 --cleanup
 ```
 
-Options & Flags
-- `-n` Number of samples to generate. Default is 10.
-- `-j` Number of jobs when building each sample. Default is 8.
-- `--model` LLM to use during repair. Default is 'gemini-3-pro-preview'.
-- `--max-iterations` Maximum number of attempts the repair agent has to alter the original configuration.
-- `--max-threads` Max number of samples that can be generated at once. Default is 1.
-- `--skip-generation` If present, will read samples from sampling.json and repair.
-- `--skip-repair` If present, will only generate samples.
-- `--cleanup` If present, will remove worktrees created after sampling and repair.
+| Option                 | Example                        | Description                                                        |
+|------------------------|--------------------------------|--------------------------------------------------------------------|
+| `-n`                   | `-n 25`                        | Number of samples to generate. Default is 10.                      |
+| `--jobs` / `-j`        | `-j 8`                         | Number of parallel jobs for building kernels. Default is 8.        |
+| `--model` / `-m`       | `--model gemini-3-pro-preview` | LLM to use during repair. Default is `gemini-3-pro-preview`.       |
+| `--max-iterations`     | `--max-iterations 5`           | Maximum repair iterations per sample. Default is 5.                |
+| `--max-threads` / `-t` | `-t 4`                         | Max samples generating concurrently. Default is 8.                 |
+| `--skip-generation`    | `--skip-generation`            | Skip generation and repair existing samples from `sampling.json`.  |
+| `--skip-repair`        | `--skip-repair`                | Only generate samples, skip repair.                                |
+| `--cleanup`            | `--cleanup`                    | Remove worktrees after processing.                                 |
+| `--rag`                | `--rag`                        | Use RAG semantic search tools instead of grep/chunk tools.         |
 
 ### Generating Samples
 
-The `sample.py` script will generate `n` random configurations from the kernel source from the current commit. To run:
+The `sample.py` script generates `n` random configurations from the kernel source at the current commit.
+
 ```bash
-python3 -m scripts.cli.sample --cleanup
+python3 -m src.cli.sample -n 25 --cleanup
 ```
 
-Options & Flags;
-- `-n` Number of samples to generate. Default is 10.
-- `-j` Number of jobs when building each sample. Default is 8.
-- `--max-threads` Max number of samples that can be generated at once. Default is 1.
-- `--cleanup` If present, will remove worktrees created after sampling.
+| Option                 | Example    | Description                                        |
+|------------------------|------------|----------------------------------------------------|
+| `-n`                   | `-n 25`    | Number of samples to generate. Default is 10.      |
+| `--jobs` / `-j`        | `-j 8`     | Number of parallel jobs for building. Default is 8.|
+| `--max-threads` / `-t` | `-t 4`     | Max samples generating concurrently. Default is 8. |
+| `--cleanup`            | `--cleanup`| Remove worktrees after sampling.                   |
 
 ### Repair
 
-You may run the repair script on each sample generated by the `sample.py` script. See [instructions on how to run](#how-to-run) each commmand.
-
-
+You may run the repair script on each sample generated by `sample.py`. See [how to run](#how-to-run) for usage.

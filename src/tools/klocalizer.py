@@ -1,14 +1,15 @@
 from singleton_decorator import singleton
 from src.config import settings
 from src.utils import file_lock
+from typing import Literal
 import subprocess
 import os
 
 @singleton
 class KLocalizer:
 
-    def run(self, kernel_src: str, log: str, define: list[str] = [], undefine: list[str] = []) -> bool:
-        
+    def run(self, kernel_src: str, log: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
+
         parent = os.path.dirname(log)
 
         with file_lock:
@@ -18,11 +19,15 @@ class KLocalizer:
 
                 for option in undefine:
                     f.write(f'!{option}\n')
-            
+
         cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, f'{parent}/constraints.txt', log]
 
         result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        
-        return result.returncode == 0
+
+        if result.returncode == 0:
+            return 'success'
+        if result.returncode == 11:
+            return 'no-satisfying-constraints'
+        return 'error'
 
 klocalizer = KLocalizer()

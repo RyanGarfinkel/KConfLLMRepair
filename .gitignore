@@ -1,9 +1,5 @@
-workspace/kernel
-workspace/images
-workspace/worktrees
-workspace/tools
-venv/
-config/
 __pycache__/
-samples/
+workspace/
+config/
+venv/
 .env

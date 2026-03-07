@@ -12,19 +12,36 @@ class Dispatcher:
         from src.config import settings
 
         n = len(tasks)
-        with ThreadPoolExecutor(max_workers=settings.runtime.MAX_THREADS) as executor:
+        max_workers = settings.runtime.MAX_THREADS
 
-            futures = { executor.submit(task): task for task in tasks }
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            pending = {}
+            task_iter = iter(tasks)
+            completed = 0
+
+            def submit_next():
+                task = next(task_iter, None)
+                if task is not None:
+                    future = executor.submit(task)
+                    pending[future] = task
 
             with tqdm(total=n, desc=desc) as pbar:
-                for i, future in enumerate(as_completed(futures), start=1):
-                    try:
-                        future.result()
-                    except Exception as e:
-                        log.error(f'Task {futures[future]} failed with error: {e}')
-                        log.error(f'Traceback:\n{"".join(traceback.format_exception(type(e), e, e.__traceback__))}')
+                for _ in range(min(max_workers, n)):
+                    submit_next()
 
-                    pbar.set_description(f'{desc} {i} / {n}')
-                    pbar.update(1)
+                while pending:
+                    for future in as_completed(pending):
+                        task = pending.pop(future)
+                        try:
+                            future.result()
+                        except Exception as e:
+                            log.error(f'Task {task} failed with error: {e}')
+                            log.error(f'Traceback:\n{"".join(traceback.format_exception(type(e), e, e.__traceback__))}')
+
+                        completed += 1
+                        pbar.set_description(f'{desc} {completed} / {n}')
+                        pbar.update(1)
+                        submit_next()
+                        break
 
 dispatcher = Dispatcher()
