@@ -8,6 +8,7 @@ from src.agent import Session
 from src.utils import log
 import click
 import json
+import os
 
 completed_sessions: list[tuple[int, Session]] = []
 
@@ -55,6 +56,7 @@ def repair_callback(i: int, session: Session):
             json.dump({
                 'summary': {
                     'n': n,
+                    'arch': settings.kernel.ARCH,
                     'successes': len([s for s in sessions if s.status == 'success']),
                     'maintenance': len([s for s in sessions if s.status == 'success-maintenance']),
                     'failures': len([s for s in sessions if s.status == 'max-attempts-reached']),
@@ -114,7 +116,8 @@ def run_experiment(n: int, skip_generation: bool, skip_repair: bool):
 @click.option('--skip-repair', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
 @click.option('--cleanup', is_flag=True, help='Clean up kernel worktrees after processing samples.')
 @click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
-def main(n: int, model: str, jobs: int, max_threads: int, max_iterations: int, skip_generation: bool, skip_repair: bool, cleanup: bool, rag: bool):
+@click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
+def main(n: int, model: str, jobs: int, max_threads: int, max_iterations: int, skip_generation: bool, skip_repair: bool, cleanup: bool, rag: bool, arch: str | None):
 
     settings.runtime.MAX_THREADS = max_threads
     settings.agent.MODEL = model
@@ -122,6 +125,10 @@ def main(n: int, model: str, jobs: int, max_threads: int, max_iterations: int, s
     settings.agent.MAX_ITERATIONS = max_iterations
     settings.runtime.CLEANUP = cleanup
     settings.runtime.USE_RAG = rag
+
+    if arch is not None:
+        settings.kernel.ARCH = arch
+        os.environ['ARCH'] = arch
 
     run_experiment(n, skip_generation, skip_repair)
 

@@ -95,6 +95,7 @@ class Session:
         return {
             'summary': {
                 'status': self.status,
+                'arch': settings.kernel.ARCH,
                 'attempts': len(self.attempts) - 1,
                 'original_config': self.base,
                 'repaired_config': repaired_config,

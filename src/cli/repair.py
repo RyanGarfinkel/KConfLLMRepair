@@ -29,7 +29,8 @@ def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Se
 @click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
 @click.option('--max-iterations', default=5, help='Maximum number of repair iterations per sample.')
 @click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
-def main(repair: str, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int, rag: bool):
+@click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
+def main(repair: str, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int, rag: bool, arch: str | None):
 
     input = Input(
         config=repair,
@@ -40,6 +41,10 @@ def main(repair: str, output: str | None, src: str | None, model: str, jobs: int
     settings.runtime.USE_RAG = rag
     settings.agent.MODEL = model
     settings.agent.MAX_ITERATIONS = max_iterations
+
+    if arch is not None:
+        settings.kernel.ARCH = arch
+        os.environ['ARCH'] = arch
 
     if src is None:
         src = settings.kernel.KERNEL_SRC
