@@ -76,15 +76,18 @@ class Kernel:
 
         return True
     
-    def run_klocalizer(self, log_path: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
+    def run_klocalizer(self, log_path: str, define: list[str] = [], undefine: list[str] = [], patch: str | None = None) -> Literal['success', 'no-satisfying-constraints', 'error']:
 
         log.info('Running KLocalizer...')
-        
+
         if not os.path.exists(f'{self.src}/.config'):
             log.error('No .config file found in kernel source. Please load a configuration before running KLocalizer.')
             return 'error'
 
-        status = klocalizer.run(self.src, log_path, define, undefine)
+        if patch is not None:
+            status = klocalizer.run_patch(self.src, patch, log_path, define, undefine)
+        else:
+            status = klocalizer.run(self.src, log_path, define, undefine)
 
         if status == 'success':
             log.success('KLocalizer completed successfully.')

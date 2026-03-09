@@ -30,4 +30,22 @@ class KLocalizer:
             return 'no-satisfying-constraints'
         return 'error'
 
+    def run_patch(self, kernel_src: str, patch: str, log: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
+
+        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_PATCH_SCRIPT, kernel_src, patch, log]
+
+        for opt in define:
+            cmd.extend(['--define', opt])
+
+        for opt in undefine:
+            cmd.extend(['--undefine', opt])
+
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        if result.returncode == 0:
+            return 'success'
+        if result.returncode == 11:
+            return 'no-satisfying-constraints'
+        return 'error'
+
 klocalizer = KLocalizer()
