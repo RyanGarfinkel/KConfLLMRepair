@@ -1,6 +1,6 @@
-from src.models import Sample, Input
+from .repair import repair_config, get_input
+from src.models import Sample
 from .sample import generate_samples
-from .repair import repair_config
 from src.utils import dispatcher
 from src.config import settings
 from src.utils import file_lock
@@ -29,10 +29,7 @@ def repair_sample(i: int, sample: Sample):
 
     log.info(f'Starting repair for sample {i + 1}...')
 
-    input = Input(
-        config=sample.config,
-        output=f'{settings.runtime.SAMPLE_DIR}/sample_{i}'
-    )
+    input = get_input(config=sample.config, output=f'{settings.runtime.SAMPLE_DIR}/sample_{i}')
 
     repair_config(input, sample.kernel_src, lambda session: repair_callback(i, session))
 

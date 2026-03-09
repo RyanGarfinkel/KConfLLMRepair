@@ -20,7 +20,7 @@ class Agent:
 
     def repair(self, input: Input, kernel: Kernel) -> Session:
         
-        session = Session(input.config, input.output)
+        session = Session(input.original_config, input.output, patch=input.patch)
         llm = model.get_llm()
 
         self.__make_dir(session.dir)
