@@ -8,11 +8,12 @@ import json
 
 class Session:
     
-    def __init__(self, config: str, output: str):
+    def __init__(self, config: str, output: str, patch: str | None = None):
 
         self.base = config
         self.attempts: list[Attempt] = []
         self.dir = output
+        self.patch = patch
 
     @property
     def latest(self) -> str | None:

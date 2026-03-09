@@ -127,11 +127,76 @@ class AgentTools:
 
             tools.append(search_boot_log)
 
+        if session.patch is not None:
+
+            @tool
+            def search_patch(options: list[str]) -> str:
+                """
+                Search for specific configuration options by name in the patch file.
+
+                Args:
+                    options (list[str]): A list of configuration option names to look up in the patch.
+                Returns:
+                    str: A string containing the lines from the patch that reference each option.
+                """
+                results = []
+                for option in options:
+                    matches = self.__grep(session.patch, option)
+                    results.extend(matches if matches else [f'{option} not found in patch.'])
+
+                session.attempts[-1].tool_calls.append(ToolCall(
+                    name='search_patch',
+                    args={ 'options': options },
+                    response=results,
+                ))
+
+                return '\n'.join(results)
+
+            tools.append(search_patch)
+
         return tools
 
     def __get_file_tools(self, session: Session) -> list[StructuredTool]:
 
         prev_attempt = session.attempts[-2]
+
+        @tool
+        def grep_patch(pattern: str) -> str:
+            """
+            Search for a pattern in the patch file that was applied to produce the broken config.
+
+            Args:
+                pattern (str): A string pattern to search for in the patch file.
+            Returns:
+                str: A string containing the lines from the patch file that match the pattern.
+            """
+            results = self.__grep(session.patch, pattern)
+            session.attempts[-1].tool_calls.append(ToolCall(
+                name='grep_patch',
+                args={ 'pattern': pattern },
+                response=results,
+            ))
+
+            return '\n'.join(results)
+
+        @tool
+        def chunk_patch(line: int) -> str:
+            """
+            Get a chunk of lines from the patch file centered around a specific line number.
+
+            Args:
+                line (int): The line number to center the chunk around.
+            Returns:
+                str: A string containing the lines from the patch file within the chunk.
+            """
+            results = self.__chunk(session.patch, line)
+            session.attempts[-1].tool_calls.append(ToolCall(
+                name='chunk_patch',
+                args={ 'line': line },
+                response=results,
+            ))
+
+            return '\n'.join(results)
 
         @tool
         def grep_build_log(pattern: str) -> str:
@@ -211,13 +276,14 @@ class AgentTools:
 
         tools = []
 
+        if session.patch is not None:
+            tools.extend([grep_patch, chunk_patch])
+
         if prev_attempt.build_log is not None:
-            tools.append(grep_build_log)
-            tools.append(chunk_build_log)
+            tools.extend([grep_build_log, chunk_build_log])
 
         if prev_attempt.boot_log is not None:
-            tools.append(grep_boot_log)
-            tools.append(chunk_boot_log)
+            tools.extend([grep_boot_log, chunk_boot_log])
 
         return tools
 
