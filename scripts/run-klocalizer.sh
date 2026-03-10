@@ -6,6 +6,7 @@ WORKING_DIR=$(pwd)
 KERNEL_SRC=$1
 CONSTRAINTS_FILE=$2
 LOG_FILE=$3
+ARCH=${4}
 
 # Validate Dependencies
 if [ -z "$SUPERC_PATH" ] || [ ! -f "$SUPERC_PATH" ]; then
@@ -14,7 +15,7 @@ if [ -z "$SUPERC_PATH" ] || [ ! -f "$SUPERC_PATH" ]; then
 fi
 
 if [ -z "$ARCH" ]; then
-    echo "[ERROR] ARCH environment variable is not set." > "$LOG_FILE"
+    echo "[ERROR] ARCH parameter is not set." > "$LOG_FILE"
     exit 1
 fi
 

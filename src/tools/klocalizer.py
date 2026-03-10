@@ -20,7 +20,7 @@ class KLocalizer:
                 for option in undefine:
                     f.write(f'!{option}\n')
 
-        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, f'{parent}/constraints.txt', log]
+        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, f'{parent}/constraints.txt', log, settings.kernel.ARCH]
 
         result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -32,7 +32,7 @@ class KLocalizer:
 
     def run_patch(self, kernel_src: str, patch: str, log: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
 
-        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_PATCH_SCRIPT, kernel_src, patch, log]
+        cmd = ['bash', settings.scripts.RUN_KLOCALIZER_PATCH_SCRIPT, kernel_src, patch, log, settings.kernel.ARCH]
 
         for opt in define:
             cmd.extend(['--define', opt])

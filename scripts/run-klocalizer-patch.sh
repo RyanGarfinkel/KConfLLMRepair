@@ -6,7 +6,8 @@ WORKING_DIR=$(pwd)
 KERNEL_SRC=$1
 PATCH_FILE=$2
 LOG_FILE=$3
-EXTRA_ARGS=("${@:4}")
+ARCH=$4
+EXTRA_ARGS=("${@:5}")
 
 # Validate Dependencies
 if [ -z "$SUPERC_PATH" ] || [ ! -f "$SUPERC_PATH" ]; then
@@ -15,7 +16,7 @@ if [ -z "$SUPERC_PATH" ] || [ ! -f "$SUPERC_PATH" ]; then
 fi
 
 if [ -z "$ARCH" ]; then
-    echo "[ERROR] ARCH environment variable is not set." > "$LOG_FILE"
+    echo "[ERROR] ARCH parameter is not set." > "$LOG_FILE"
     exit 1
 fi
 
@@ -29,7 +30,7 @@ cd $KERNEL_SRC
 rm -f "$LOG_FILE"
 
 LLVM=1 CC="clang -fintegrated-as" LD=ld.lld \
-        klocalizer -a x86_64 \
+        klocalizer -a $ARCH \
         --repair "$KERNEL_SRC/.config" \
         --include-mutex $PATCH_FILE \
         "${EXTRA_ARGS[@]}" > "$LOG_FILE" 2>&1
