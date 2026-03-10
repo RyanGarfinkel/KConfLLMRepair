@@ -36,27 +36,29 @@ class Sampler:
 				**{**sample.model_dump(), 'kernel_src': kernel_src, 'kernel_version': kernel.version}
 			)
 
-			if os.path.exists(sample.sample_dir):
-				shutil.rmtree(sample.sample_dir)
+			try:
+				if os.path.exists(sample.sample_dir):
+					shutil.rmtree(sample.sample_dir)
 
-			os.makedirs(sample.sample_dir, exist_ok=True)
+				os.makedirs(sample.sample_dir, exist_ok=True)
 
-			if not kernel.make_rand_config(f'{sample.sample_dir}/.config', sample.seed):
-				log.error(f'Failed to create random sample {i + 1}.')
-				return
+				if not kernel.make_rand_config(f'{sample.sample_dir}/.config', sample.seed):
+					log.error(f'Failed to create random sample {i + 1}.')
+					return
 
-			sample.original_config = f'{sample.sample_dir}/.config'
-			log.info(f'Sample {i + 1} created successfully.')
+				sample.original_config = f'{sample.sample_dir}/.config'
+				log.info(f'Sample {i + 1} created successfully.')
 
-			completed.append(sample)
-			self.__save(summary, completed)
+				completed.append(sample)
+				self.__save(summary, completed)
 
-			if complete_callback is not None:
-				complete_callback(i, sample)
+				if complete_callback is not None:
+					complete_callback(i, sample)
 
-			if settings.runtime.CLEANUP:
-				log.info(f'Cleaning up sample {i + 1} worktree...')
-				worktree.cleanup(sample.kernel_src)
+			finally:
+				if settings.runtime.CLEANUP:
+					log.info(f'Cleaning up sample {i + 1} worktree...')
+					worktree.cleanup(sample.kernel_src)
 
 		tasks = [lambda idx=i: process(idx) for i in range(n)]
 		dispatcher.run_tasks(tasks, desc='Generating samples')
@@ -106,25 +108,27 @@ class Sampler:
 				**{**sample.model_dump(), 'kernel_src': kernel_src, 'kernel_version': kernel.version}
 			)
 
-			if os.path.exists(sample.sample_dir):
-				shutil.rmtree(sample.sample_dir)
+			try:
+				if os.path.exists(sample.sample_dir):
+					shutil.rmtree(sample.sample_dir)
 
-			os.makedirs(sample.sample_dir, exist_ok=True)
+				os.makedirs(sample.sample_dir, exist_ok=True)
 
-			if not self.__make_patch_sample(sample, kernel):
-				log.error(f'Failed to create patch sample {i + 1}.')
-				return
+				if not self.__make_patch_sample(sample, kernel):
+					log.error(f'Failed to create patch sample {i + 1}.')
+					return
 
-			log.success(f'Patch sample {i + 1} created successfully.')
-			completed.append(sample)
-			self.__save(summary, completed)
+				log.success(f'Patch sample {i + 1} created successfully.')
+				completed.append(sample)
+				self.__save(summary, completed)
 
-			if complete_callback is not None:
-				complete_callback(i, sample)
+				if complete_callback is not None:
+					complete_callback(i, sample)
 
-			if settings.runtime.CLEANUP:
-				log.info(f'Cleaning up sample {i + 1} worktree...')
-				worktree.cleanup(sample.kernel_src)
+			finally:
+				if settings.runtime.CLEANUP:
+					log.info(f'Cleaning up sample {i + 1} worktree...')
+					worktree.cleanup(sample.kernel_src)
 
 		tasks = [lambda idx=i: process(idx) for i in range(n)]
 		dispatcher.run_tasks(tasks, desc='Generating patch samples')
@@ -137,8 +141,11 @@ class Sampler:
 
 		all_commits = main_repo.git.rev_list('HEAD', f'--since={since}', '--no-merges').splitlines()
 		total_commits = len(all_commits) - settings.runtime.COMMIT_WINDOW
-		k = total_commits // n
 
+		if total_commits < n:
+			raise ValueError(f'Not enough commits ({total_commits}) for {n} samples with COMMIT_WINDOW={settings.runtime.COMMIT_WINDOW}.')
+
+		k = total_commits // n
 		start = random.randint(0, k)
 
 		summary = {
