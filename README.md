@@ -34,6 +34,7 @@ python3 -m src.cli.repair --repair broken.config --src $KERNEL_SRC
 | `--jobs`           | :x:                | `--jobs 8`                       | Number of jobs to run when building the kernel. Default is 8.     |
 | `--max-iterations` | :x:                | `--max-iterations 5`             | Maximum number of repair iterations. Default is 5.                |
 | `--rag`            | :x:                | `--rag`                          | Use RAG semantic search tools instead of grep/chunk tools.        |
+| `--arch` / `-a`    | :x:                | `--arch arm64`                   | Target architecture (`x86_64` or `arm64`). Defaults to `$ARCH`.  |
 
 ### Tools
 
@@ -99,6 +100,7 @@ python3 -m src.cli.experiment -n 25 --cleanup
 | `--skip-repair`        | `--skip-repair`                | Only generate samples, skip repair.                                |
 | `--cleanup`            | `--cleanup`                    | Remove worktrees after processing.                                 |
 | `--rag`                | `--rag`                        | Use RAG semantic search tools instead of grep/chunk tools.         |
+| `--arch` / `-a`        | `--arch arm64`                 | Target architecture (`x86_64` or `arm64`). Defaults to `$ARCH`.   |
 
 ### Generating Samples
 

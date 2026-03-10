@@ -6,9 +6,16 @@ import os
 class KernelSettings(BaseModel):
 
     KERNEL_SRC: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'kernel')))
-    BZIMAGE: str = Field(default='arch/x86/boot/bzImage', frozen=True)
+    ARCH: str = Field(default='x86_64')
+    CROSS_COMPILE: str = Field(default='')
     SYZKCONF_INSTANCE: str = Field(default='upstream-apparmor-kasan', frozen=True)
     DIFFCONFIG: str = Field(default='scripts/diffconfig', frozen=True)
+
+    @property
+    def BZIMAGE(self) -> str:
+        if self.ARCH == 'arm64':
+            return 'arch/arm64/boot/Image'
+        return 'arch/x86/boot/bzImage'
 
     @property
     def WORKTREE_DIR(self) -> str:
@@ -148,5 +155,6 @@ try:
     print(f'[INFO] Using {settings.agent.MODEL}')
     print(f'[INFO] Model from {settings.agent.PROVIDER}')
     print(f'[INFO] kernel-src {settings.kernel.KERNEL_SRC}')
+    print(f'[INFO] target arch: {settings.kernel.ARCH}')
 except Exception as e:
     raise RuntimeError(f'Failed to load configuration: {e}')

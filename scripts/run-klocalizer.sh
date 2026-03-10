@@ -28,7 +28,7 @@ cd $KERNEL_SRC
 rm -f "$LOG_FILE"
 
 LLVM=1 CC="clang -fintegrated-as" LD=ld.lld \
-        klocalizer -a x86_64 \
+        klocalizer -a $ARCH \
         --repair "$KERNEL_SRC/.config" \
         --config-mutex-file $CONSTRAINTS_FILE > "$LOG_FILE" 2>&1
         

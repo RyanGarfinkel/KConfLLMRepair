@@ -8,7 +8,7 @@ class RandConfig:
 
     def make(self, kernel_src: str, output: str, seed: int) -> bool:
 
-        cmd = ['bash', settings.scripts.RAND_CONFIG_SCRIPT, kernel_src, output, str(seed)]
+        cmd = ['bash', settings.scripts.RAND_CONFIG_SCRIPT, kernel_src, output, str(seed), settings.kernel.ARCH]
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
