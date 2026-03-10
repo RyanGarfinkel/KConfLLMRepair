@@ -227,6 +227,11 @@ class Sampler:
 
 		return True
 
+	def read_samples(self, n: int) -> list[Sample]:
+		with open(f'{settings.runtime.SAMPLE_DIR}/sampling.json', 'r') as f:
+			data = json.load(f)
+		return [Sample(**s) for s in data.get('samples', [])][:n]
+
 	def __save(self, summary: dict, completed_samples: list[Sample]):
 
 		with file_lock:

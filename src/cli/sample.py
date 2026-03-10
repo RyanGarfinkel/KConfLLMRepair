@@ -9,13 +9,15 @@ import click
 @click.option('--random', 'mode', flag_value='random', default=True, help='Generate random config samples (default).')
 @click.option('--since', default='2020-01-01', help='Only consider commits after this date (used with --patch).')
 @click.option('--jobs', '-j', default=8, help='Number of parallel jobs to use for building kernels.')
-@click.option('--max-threads', '-t', default=8, help='Maximum number of samples generating at once.')
+@click.option('--max-threads', '-t', default=1, help='Maximum number of samples generating at once.')
 @click.option('--cleanup', is_flag=True, default=False, help='Clean up kernel worktrees after sampling.')
-def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bool):
+@click.option('--commit-window', default=250, help='Number of commits between start and end commit for patch samples.')
+def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bool, commit_window: int):
 
 	settings.runtime.MAX_THREADS = max_threads
 	settings.runtime.CLEANUP = cleanup
 	settings.runtime.JOBS = jobs
+	settings.runtime.COMMIT_WINDOW = commit_window
 
 	log.info(f'Starting {mode} sample generation for {n} samples...')
 

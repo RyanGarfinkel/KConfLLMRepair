@@ -19,7 +19,7 @@ class Agent:
         self.middleware = [ToolCallLimitMiddleware(run_limit=settings.agent.MAX_TOOL_CALLS)]
 
     def repair(self, input: Input, kernel: Kernel) -> Session:
-        
+
         session = Session(input.original_config, input.output, patch=input.patch)
         llm = model.get_llm()
 
@@ -132,22 +132,29 @@ class Agent:
         if not kernel.load_config(session.base):
             return
         
-        attempt.klocalizer_log = f'{dir}/klocalizer.log'
-        attempt.klocalizer_status = kernel.run_klocalizer(attempt.klocalizer_log, agent_response.define, agent_response.undefine)
+        self.__apply_and_test(attempt, kernel, agent_response.define, agent_response.undefine)
+
+    def __apply_and_test(self, attempt: Attempt, kernel: Kernel, define: list[str], undefine: list[str]):
+
+        # KLocalizer
+        attempt.klocalizer_log = f'{attempt.dir}/klocalizer.log'
+        attempt.klocalizer_status = kernel.run_klocalizer(attempt.klocalizer_log, define, undefine)
         if attempt.klocalizer_status != 'success':
             return
-        attempt.config = f'{dir}/modified.config'
+        
+        attempt.config = f'{attempt.dir}/modified.config'
 
         shutil.copyfile(f'{kernel.src}/.config', attempt.config)
 
-        # Build and Boot Test
-        attempt.build_log = f'{dir}/build.log'
+        # Build
+        attempt.build_log = f'{attempt.dir}/build.log'
         if not kernel.build(attempt.build_log):
             return
         
         attempt.build_succeeded = True
 
-        attempt.boot_log = f'{dir}/boot.log'
+        # Boot
+        attempt.boot_log = f'{attempt.dir}/boot.log'
         attempt.boot_succeeded = kernel.boot(attempt.boot_log)
         
     def __extract_token_usage(self, response: dict) -> LLMUsage:
