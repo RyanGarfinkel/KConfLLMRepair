@@ -14,17 +14,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Linux kernel
-        uses: actions/cache@v4
-        id: kernel-cache
-        with:
-          path: workspace/kernel
-          key: linux-v6.19
-
-      - name: Clone Linux kernel
-        if: steps.kernel-cache.outputs.cache-hit != 'true'
-        run: git clone --depth=1 --branch v6.19 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git workspace/kernel
-
       - name: Run setup
         run: bash setup.sh
 

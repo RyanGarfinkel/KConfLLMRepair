@@ -50,8 +50,8 @@ else
     echo '[INFO] Linux Kernel already cloned at workspace/kernel'
     echo '[INFO] Pulling latest changes...'
     cd workspace/kernel
-    git fetch origin
-    git reset --hard origin/v6.19
+    git fetch --depth 1 origin v6.19
+    git reset --hard FETCH_HEAD
     echo '[SUCCESS] Linux Kernel updated successfully.'
     cd $ROOT
 fi
