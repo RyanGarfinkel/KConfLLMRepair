@@ -4,6 +4,7 @@ from src.tools import diffconfig
 from src.utils import file_lock
 from src.config import settings
 from typing import Tuple
+import time
 import json
 
 class Session:
@@ -14,6 +15,13 @@ class Session:
         self.attempts: list[Attempt] = []
         self.dir = output
         self.patch = patch
+        self.__start_time = time.time()
+        self.end_time: float | None = None
+
+    @property
+    def duration(self) -> float:
+        end = self.end_time if self.end_time is not None else time.time()
+        return round(end - self.__start_time, 2)
 
     @property
     def latest(self) -> str | None:
@@ -98,6 +106,7 @@ class Session:
                 'status': self.status,
                 'arch': settings.kernel.ARCH,
                 'attempts': len(self.attempts) - 1,
+                'duration': self.duration,
                 'original_config': self.base,
                 'repaired_config': repaired_config,
                 'edit_distance': edit_distance,

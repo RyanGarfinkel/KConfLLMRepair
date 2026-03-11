@@ -9,6 +9,7 @@ from src.utils import file_lock
 from .kernel import Kernel
 from src.utils import log
 import shutil
+import time
 import json
 import os
 
@@ -29,13 +30,14 @@ class Agent:
         session.attempts.append(inital_attempt)
 
         if inital_attempt.boot_succeeded == 'yes':
+            session.end_time = time.time()
             return session
 
         log.info('Beginning repair process...')
 
         for i in range(settings.agent.MAX_ITERATIONS):
             
-            if session.status == 'success':
+            if session.status in ('success', 'success-maintenance'):
                 break
 
             log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS}...')
@@ -43,6 +45,8 @@ class Agent:
             self.__attempt(llm, kernel, session)
 
             session.save(f'{input.output}/summary.json')
+
+        session.end_time = time.time()
 
         if session.status == 'success':
             log.success('Repair process completed successfully!')
