@@ -110,10 +110,14 @@ if ! command -v go &> /dev/null; then
     tar -C ~/.local -xzf go.tar.gz
     rm go.tar.gz
 
+    export GOROOT=$HOME/.local/go
     echo '[SUCCESS] Go installed successfully.'
 else
     echo '[INFO] Go is already installed.'
+    export GOROOT=$(go env GOROOT)
 fi
+
+export PATH=$PATH:$GOROOT/bin
 
 # Syzkaller Installation & Build
 if [ ! -d 'workspace/tools/syzkaller' ]; then
@@ -122,9 +126,6 @@ if [ ! -d 'workspace/tools/syzkaller' ]; then
 else
     echo '[INFO] Syzkaller already exists at workspace/tools/syzkaller'
 fi
-
-export GOROOT=$HOME/.local/go
-export PATH=$PATH:$GOROOT/bin
 
 cd workspace/tools/syzkaller
 make
