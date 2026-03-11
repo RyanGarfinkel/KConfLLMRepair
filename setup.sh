@@ -29,6 +29,7 @@ if [ "$SKIP_DEPENDENCIES" != "true" ]; then
     sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
 else
     echo '[ERROR] Cannot install dependencies. This script may fail. To prevent this, please manually install the required dependencies.'
+fi
 
 # Workspace Setup
 echo '[INFO] Setting up the workspace directory...'
