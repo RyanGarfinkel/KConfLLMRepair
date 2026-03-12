@@ -9,16 +9,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Run setup
-        run: bash setup.sh
-
       - name: Run unit tests
-        run: |
-          source activate.sh
-          pytest tests/unit -v
-        env:
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: pytest tests/unit -v
