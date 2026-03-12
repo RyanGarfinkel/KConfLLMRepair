@@ -178,17 +178,15 @@ fi
 
 . venv/bin/activate
 
+echo '[INFO] Installing Python dependencies...'
+pip install --upgrade pip setuptools
+pip install -r requirements.txt
+echo '[SUCCESS] Python dependencies installed successfully.'
+
 echo '[INFO] Installing KMax dependencies...'
 cd workspace/tools/kmax
 pip install .
 cd $ROOT
-
-echo '[INFO] Installing Python dependencies...'
-
-pip install --upgrade pip
-pip install -r requirements.txt
-
-echo '[SUCCESS] Python dependencies installed successfully.'
 
 # Finish
 echo '[SUCCESS] Setup complete.'
