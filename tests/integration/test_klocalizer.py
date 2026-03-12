@@ -1,6 +1,18 @@
 from src.tools.klocalizer import klocalizer
 from src.config import settings
+import subprocess
+import pytest
 import os
+
+
+@pytest.fixture(scope='module', autouse=True)
+def kernel_config():
+	subprocess.run(['make', '-C', settings.kernel.KERNEL_SRC, 'ARCH=x86_64', 'defconfig'], check=True)
+
+	yield
+	
+	os.remove(f'{settings.kernel.KERNEL_SRC}/.config')
+
 
 # Config KLocalizer: Success
 def test_run(tmp_path):
