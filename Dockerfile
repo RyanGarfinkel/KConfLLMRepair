@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -10,11 +10,11 @@ RUN apt-get update && apt-get install -y \
     git wget unzip xz-utils lftp default-jdk \
     openjdk-8-jdk libz3-java libjson-java sat4j \
     qemu-system-x86 libdw-dev ccache \
-    clang-15 llvm-15 lld-15 \
+    clang-18 llvm-18 lld-18 \
     gcc-x86-64-linux-gnu \
     && rm -rf /var/lib/apt/lists/* \
-    && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 \
-    && update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
+    && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100 \
+    && update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-18 100
 
 # Go
 ENV GOROOT=/opt/go

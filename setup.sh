@@ -22,11 +22,11 @@ if [ "$SKIP_DEPENDENCIES" != "true" ]; then
         git wget unzip xz-utils lftp default-jdk \
         openjdk-8-jdk libz3-java libjson-java sat4j \
         qemu-system-x86 libdw-dev ccache \
-        clang-15 llvm-15 lld-15 \
+        clang-18 llvm-18 lld-18 \
         gcc-x86-64-linux-gnu
 
-    sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100
-    sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-15 100
+    sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+    sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-18 100
 else
     echo '[ERROR] Cannot install dependencies. This script may fail. To prevent this, please manually install the required dependencies.'
 fi
