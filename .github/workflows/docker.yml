@@ -1,6 +1,11 @@
 name: Build Docker Image
 
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - Dockerfile
+      - requirements.txt
   push:
     branches: [main]
     paths:
