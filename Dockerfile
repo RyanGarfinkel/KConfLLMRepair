@@ -55,13 +55,12 @@ RUN git clone --depth 1 --branch v6.19 \
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH=$VIRTUAL_ENV/bin:/usr/lib/ccache:$PATH
 COPY requirements.txt /tmp/requirements.txt
-RUN pip3 install setuptools \
-    && python3 -m venv $VIRTUAL_ENV \
+RUN python3 -m venv $VIRTUAL_ENV \
     && pip install --upgrade pip setuptools \
     && pip install -r /tmp/requirements.txt \
     && git clone --branch dev/klocalizer-add-check-mutex --depth 1 \
         https://github.com/paulgazz/kmax.git /tmp/kmax \
-    && cd /tmp/kmax && pip install . \
+    && cd /tmp/kmax && pip install --no-build-isolation . \
     && rm -rf /tmp/kmax /tmp/requirements.txt
 
 ENV CPLUS_INCLUDE_PATH=/root/.local/include:/root/.local/include/elfutils
