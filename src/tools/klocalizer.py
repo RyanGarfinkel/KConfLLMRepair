@@ -10,6 +10,9 @@ class KLocalizer:
 
     def run(self, kernel_src: str, log: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
 
+        if set(define) & set(undefine):
+            return 'no-satisfying-constraints'
+
         parent = os.path.dirname(log)
 
         with file_lock:

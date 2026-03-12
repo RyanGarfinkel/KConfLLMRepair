@@ -23,7 +23,7 @@ make.cross LLVM=1 ARCH="$ARCH" olddefconfig
 # Building the kernel
 rm -f $LOG_FILE
 
-make.cross -j$JOB_COUNT LLVM=1 ARCH="$ARCH" "$BZIMAGE" > $LOG_FILE 2>&1 || \
+make.cross -j$JOB_COUNT LLVM=1 ARCH="$ARCH" "$(basename $BZIMAGE)" > $LOG_FILE 2>&1 || \
     { exit 1; }
 
 cd $WORKING_DIR

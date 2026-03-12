@@ -7,7 +7,8 @@ WORKING_DIR=$(pwd)
 KERNEL_SRC=$1
 BZ_IMG=$2
 LOG_FILE=$3
-TIMEOUT=${4:-300} # 5m Default
+ARCH=$4
+TIMEOUT=${5:-300} # 5m Default
 
 # Variables
 SUCCESS_STRING='login:'
@@ -17,16 +18,30 @@ MAINTENANCE_STRING='Press Enter for maintenance'
 rm -f "$LOG_FILE"
 cd "$WORKING_DIR"
 
-qemu-system-x86_64 \
-    -m 2G \
-    -smp 2 \
-    -kernel "$BZ_IMG" \
-    -append "console=ttyS0 root=/dev/sda earlyprintk=serial net.ifnames=0" \
-    -drive file="$DEBIAN_IMG",format=raw \
-    -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22 \
-    -net nic,model=e1000 \
-    -enable-kvm \
-    -nographic > "$LOG_FILE" 2>&1 &
+if [ "$ARCH" = "arm64" ]; then
+    qemu-system-aarch64 \
+        -M virt \
+        -m 2G \
+        -smp 2 \
+        -kernel "$BZ_IMG" \
+        -append "console=ttyAMA0 root=/dev/vda earlyprintk=serial net.ifnames=0" \
+        -drive file="$DEBIAN_IMG",format=raw,if=virtio \
+        -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22 \
+        -net nic,model=e1000 \
+        -enable-kvm \
+        -nographic > "$LOG_FILE" 2>&1 &
+else
+    qemu-system-x86_64 \
+        -m 2G \
+        -smp 2 \
+        -kernel "$BZ_IMG" \
+        -append "console=ttyS0 root=/dev/sda earlyprintk=serial net.ifnames=0" \
+        -drive file="$DEBIAN_IMG",format=raw \
+        -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22 \
+        -net nic,model=e1000 \
+        -enable-kvm \
+        -nographic > "$LOG_FILE" 2>&1 &
+fi
 
 # Waiting for Login Prompt
 PID=$!

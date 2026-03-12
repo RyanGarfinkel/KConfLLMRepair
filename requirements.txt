@@ -4,6 +4,7 @@ google-auth-httplib2
 google-auth-oauthlib
 langchain-community
 singleton-decorator
+pydantic-settings
 langchain-openai
 langchain-core
 google-genai
