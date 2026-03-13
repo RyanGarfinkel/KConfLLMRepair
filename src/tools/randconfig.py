@@ -12,7 +12,7 @@ class RandConfig:
         result = subprocess.run(cmd, capture_output=True, text=True)
         
         if result.returncode != 0:
-            log.error(f'Syzkaller failed with exit code {result.returncode}')
+            log.error(f'randconfig failed with exit code {result.returncode}')
             if result.stderr:
                 log.error(f'Stderr: {result.stderr}')
 

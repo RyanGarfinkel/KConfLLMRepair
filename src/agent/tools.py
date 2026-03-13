@@ -4,6 +4,7 @@ from singleton_decorator import singleton
 from src.config import settings
 from .search import LogSearch
 from .session import Session
+import re
 import os
 
 @singleton
@@ -14,10 +15,15 @@ class AgentTools:
         if not os.path.exists(path):
                 return [f'{path} does not exist.']
 
+        try:
+            compiled = re.compile(pattern, re.IGNORECASE)
+        except re.error:
+            compiled = re.compile(re.escape(pattern), re.IGNORECASE)
+
         results = []
         with open(path, 'r', errors='replace') as f:
             for i, line in enumerate(f, 1):
-                if pattern.lower() in line.lower():
+                if compiled.search(line):
                     results.append(f'{i + 1}: {line.strip()}')
         
         return results[-50:]
