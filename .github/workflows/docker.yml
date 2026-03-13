@@ -38,3 +38,4 @@ jobs:
           tags: ghcr.io/ryangarfinkel/kconfllmrepair:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          allow: security.insecure

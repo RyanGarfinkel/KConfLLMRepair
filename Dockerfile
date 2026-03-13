@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -15,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     gcc-x86-64-linux-gnu \
     gcc-aarch64-linux-gnu \
     ccache \
+    debootstrap \
     && rm -rf /var/lib/apt/lists/* \
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 100 \
     && update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-15 100 \
@@ -67,3 +69,11 @@ ENV C_INCLUDE_PATH=/root/.local/include:/root/.local/include/elfutils
 ENV CROSS_COMPILE=x86_64-linux-gnu-
 ENV LIBRARY_PATH=/root/.local/lib
 ENV ARCH=x86_64
+
+# Debian Image
+ENV DEBIAN_IMG=/opt/images/bullseye.img
+RUN --security=insecure mkdir -p /opt/images \
+    && wget https://raw.githubusercontent.com/google/syzkaller/master/tools/create-image.sh -O /tmp/create-image.sh \
+    && chmod +x /tmp/create-image.sh \
+    && cd /opt/images && /tmp/create-image.sh --distribution bullseye --feature minimal \
+    && rm /tmp/create-image.sh
