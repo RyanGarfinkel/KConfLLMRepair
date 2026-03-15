@@ -31,6 +31,16 @@ else
     echo '[ERROR] Cannot install dependencies. This script may fail. To prevent this, please manually install the required dependencies.'
 fi
 
+# make.cross
+if ! command -v make.cross &> /dev/null; then
+    echo '[INFO] Installing make.cross...'
+    wget https://raw.githubusercontent.com/intel/lkp-tests/master/kbuild/make.cross -O /usr/local/bin/make.cross
+    chmod +x /usr/local/bin/make.cross
+    echo '[SUCCESS] make.cross installed successfully.'
+else
+    echo '[INFO] make.cross is already installed.'
+fi
+
 # Workspace Setup
 echo '[INFO] Setting up the workspace directory...'
 

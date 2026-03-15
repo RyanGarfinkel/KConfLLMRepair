@@ -23,9 +23,9 @@ RUN apt-get update && apt-get install -y \
         update-alternatives --install /usr/bin/llvm-$tool llvm-$tool /usr/bin/llvm-$tool-15 100; \
     done
 
-# Make Cross
-RUN echo '#!/bin/sh' > /usr/local/bin/make.cross \
-    && echo 'exec make "$@"' >> /usr/local/bin/make.cross \
+# make.cross
+RUN wget https://raw.githubusercontent.com/intel/lkp-tests/master/kbuild/make.cross \
+        -O /usr/local/bin/make.cross \
     && chmod +x /usr/local/bin/make.cross
 
 # Z3

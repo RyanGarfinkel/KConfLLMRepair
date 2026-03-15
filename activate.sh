@@ -23,6 +23,7 @@ export SAMPLE_DIR=$ROOT/workspace/samples
 export WORKTREE_DIR=$ROOT/workspace/worktrees
 
 # Build Settings
+export COMPILER_INSTALL_PATH=$HOME/0day
 export CROSS_COMPILE=x86_64-linux-gnu-
 export DEBIAN_IMG=$ROOT/workspace/images/bullseye.img # $ROOT/workspace/images/debian.raw
 export GOROOT=$HOME/.local/go
