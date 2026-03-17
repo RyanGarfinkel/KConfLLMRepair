@@ -6,6 +6,7 @@ import os
 class KernelSettings(BaseModel):
 
     KERNEL_SRC: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'kernel')))
+    DEBIAN_IMG: str = Field(default='')
     ARCH: str = Field(default='x86_64')
     CROSS_COMPILE: str = Field(default='')
     SYZKCONF_INSTANCE: str = Field(default='upstream-apparmor-kasan', frozen=True)
@@ -37,9 +38,9 @@ class RuntimeSettings(BaseModel):
     CLEANUP: bool = Field(default=False)
     USE_RAG: bool = Field(default=False)
 
-    SAMPLE_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
+    OUTPUT_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
 
-    @field_validator('SAMPLE_DIR')
+    @field_validator('OUTPUT_DIR')
     def validate(cls, v: str) -> str:
         if v:
             os.makedirs(v, exist_ok=True)
@@ -70,7 +71,7 @@ class AgentSettings(BaseModel):
         else:
             raise ValueError(f'Unknown embedding model for provider: {self.PROVIDER}')
 
-    MAX_ITERATIONS: int = Field(default=5, ge=1)
+    MAX_ITERATIONS: int = Field(default=20, ge=1)
     MAX_TOOL_CALLS: int = Field(default=20, ge=1)
     MAX_MATCHES: int = 5
 
@@ -80,11 +81,6 @@ class AgentSettings(BaseModel):
             return self
 
         raise ValueError('At least one API key must be provided.')
-
-class DriveSettings(BaseModel):
-
-	FOLDER_ID: Optional[str] = Field(default=None)
-	SERVICE_ACCOUNT_FILE: Optional[str] = Field(default=None)
 
 class ScriptSettings(BaseModel):
 
@@ -124,7 +120,6 @@ class Settings(BaseSettings):
     runtime: RuntimeSettings = Field(default_factory=RuntimeSettings)
     agent: AgentSettings = Field(default_factory=AgentSettings)
     scripts: ScriptSettings = Field(default_factory=ScriptSettings)
-    drive: DriveSettings = Field(default_factory=DriveSettings)
 
     model_config = SettingsConfigDict(
         env_file_encoding='utf-8',
@@ -143,14 +138,12 @@ class Settings(BaseSettings):
         runtime_data = {k: src.get(k) for k in RuntimeSettings.model_fields if k in src}
         agent_data = {k: src.get(k) for k in AgentSettings.model_fields if k in src}
         scripts_data = {k: src.get(k) for k in ScriptSettings.model_fields if k in src}
-        drive_data = {k: src.get(k) for k in DriveSettings.model_fields if k in src}
 
         return {
             'kernel': kernel_data,
             'runtime': runtime_data,
             'agent': agent_data,
             'scripts': scripts_data,
-            'drive': drive_data,
         }
 
 settings = None

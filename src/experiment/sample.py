@@ -78,7 +78,7 @@ class Sampler:
 
 		samples = [
 			Sample(
-				sample_dir=f'{settings.runtime.SAMPLE_DIR}/sample_{i}',
+				sample_dir=f'{settings.runtime.OUTPUT_DIR}/sample_{i}',
 				seed=random.randint(1, 100000000),
 				kernel_src='',
 				kernel_version='',
@@ -165,7 +165,7 @@ class Sampler:
 
 		samples = [Sample(
 			original_config='',
-			sample_dir=f'{settings.runtime.SAMPLE_DIR}/sample_{i}',
+			sample_dir=f'{settings.runtime.OUTPUT_DIR}/sample_{i}',
 			kernel_src='',
 			kernel_version='',
 			start_commit=all_commits[start + i * k + settings.runtime.COMMIT_WINDOW],
@@ -193,11 +193,7 @@ class Sampler:
 		log.success('Base configuration generated successfully.')
 		log.info('Verifying base configuration bootability...')
 
-		if not kernel.load_config(original_config):
-			log.error('Failed to load base configuration.')
-			return False
-		
-		if kernel.build(f'{sample.sample_dir}/build.log') and kernel.boot(f'{sample.sample_dir}/boot.log') == 'yes':
+		if kernel.build(sample.sample_dir, original_config).ok and kernel.boot(sample.sample_dir).status == 'yes':
 			log.success('Base configuration is valid and bootable.')
 			sample.original_config = original_config
 		else:
@@ -213,11 +209,7 @@ class Sampler:
 
 		sample.patch = patch_path
 		
-		if not kernel.load_config(original_config):
-			log.error('Failed to load original configuration for patch sample.')
-			return False
-		
-		if not kernel.run_klocalizer(f'{sample.sample_dir}/klocalizer.log', patch=patch_path) == 'success':
+		if kernel.run_klocalizer(sample.sample_dir, original_config, patch=patch_path).status != 'success':
 			log.error('KLocalizer failed for patch sample.')
 			return False
 		
@@ -228,14 +220,14 @@ class Sampler:
 		return True
 
 	def read_samples(self, n: int) -> list[Sample]:
-		with open(f'{settings.runtime.SAMPLE_DIR}/sampling.json', 'r') as f:
+		with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'r') as f:
 			data = json.load(f)
 		return [Sample(**s) for s in data.get('samples', [])][:n]
 
 	def __save(self, summary: dict, completed_samples: list[Sample]):
 
 		with file_lock:
-			with open(f'{settings.runtime.SAMPLE_DIR}/sampling.json', 'w') as f:
+			with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'w') as f:
 				json.dump({
 					'summary': summary,
 					'samples': [s.model_dump() for s in completed_samples]

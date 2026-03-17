@@ -1,19 +1,26 @@
 from googleapiclient.http import MediaFileUpload
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
+from pydantic_settings import BaseSettings
 from src.config import settings
 from src.utils import log
 from datetime import date
+from pydantic import Field
 import os
 
 SCOPES = ['https://www.googleapis.com/auth/drive']
+
+class DriveSettings(BaseSettings):
+	FOLDER_ID: str | None = Field(default=None)
+	SERVICE_ACCOUNT_FILE: str | None = Field(default=None)
 
 class DriveUploader:
 
 	def __init__(self):
 
-		credentials_file = settings.drive.SERVICE_ACCOUNT_FILE
-		folder_id = settings.drive.FOLDER_ID
+		drive_settings = DriveSettings()
+		credentials_file = drive_settings.SERVICE_ACCOUNT_FILE
+		folder_id = drive_settings.FOLDER_ID
 
 		if not credentials_file or not folder_id:
 			log.warning('Drive upload disabled: DRIVE_SERVICE_ACCOUNT_FILE or DRIVE_FOLDER_ID not set.')
@@ -51,7 +58,7 @@ class DriveUploader:
 		if not self.__enabled:
 			return
 
-		path = f'{settings.runtime.SAMPLE_DIR}/{filename}'
+		path = f'{settings.runtime.OUTPUT_DIR}/{filename}'
 
 		if not os.path.exists(path):
 			log.warning(f'{filename} not found, skipping Drive upload.')

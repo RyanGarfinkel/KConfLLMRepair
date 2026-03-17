@@ -1,6 +1,5 @@
 from singleton_decorator import singleton
 from src.config import settings
-from src.utils import file_lock
 from typing import Literal
 import subprocess
 import os
@@ -15,15 +14,14 @@ class KLocalizer:
 
         parent = os.path.dirname(log)
 
-        with file_lock:
-            with open(f'{parent}/constraints.txt', 'w') as f:
-                for option in define:
-                    name = option if option.startswith('CONFIG_') else f'CONFIG_{option}'
-                    f.write(f'{name}\n')
+        with open(f'{parent}/constraints.txt', 'w') as f:
+            for option in define:
+                name = option if option.startswith('CONFIG_') else f'CONFIG_{option}'
+                f.write(f'{name}\n')
 
-                for option in undefine:
-                    name = option if option.startswith('CONFIG_') else f'CONFIG_{option}'
-                    f.write(f'!{name}\n')
+            for option in undefine:
+                name = option if option.startswith('CONFIG_') else f'CONFIG_{option}'
+                f.write(f'!{name}\n')
 
         cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, f'{parent}/constraints.txt', log, settings.kernel.ARCH]
 

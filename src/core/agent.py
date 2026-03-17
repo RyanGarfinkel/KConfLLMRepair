@@ -1,11 +1,10 @@
-from src.models import Input, AgentResponse, Attempt, LLMUsage
 from langchain.agents.middleware import ToolCallLimitMiddleware
+from src.models import Input, AgentResponse, Attempt, LLMUsage
 from src.agent import agent_tools, Session, prompt, model
 from langchain_core.language_models import BaseChatModel
 from singleton_decorator import singleton
 from langchain.agents import create_agent
 from src.config import settings
-from src.utils import file_lock
 from .kernel import Kernel
 from src.utils import log
 import shutil
@@ -21,10 +20,11 @@ class Agent:
 
     def repair(self, input: Input, kernel: Kernel) -> Session:
 
-        session = Session(input.original_config, input.output, patch=input.patch)
-        llm = model.get_llm()
+        output_dir = settings.runtime.OUTPUT_DIR
+        self.__make_dir(output_dir)
 
-        self.__make_dir(session.dir)
+        session = Session(input.original_config, output_dir, patch=input.patch)
+        llm = model.get_llm()
 
         inital_attempt = self.__inital_attempt(kernel, session)
         session.attempts.append(inital_attempt)
@@ -44,16 +44,16 @@ class Agent:
 
             self.__attempt(llm, kernel, session)
 
-            session.save(f'{input.output}/summary.json')
+            session.save(f'{output_dir}/summary.json')
 
         session.end_time = time.time()
 
         if session.status == 'success':
             log.success('Repair process completed successfully!')
-            shutil.copyfile(session.attempts[-1].config, f'{input.output}/repaired.config')
+            shutil.copyfile(session.attempts[-1].config, f'{output_dir}/repaired.config')
         elif session.status == 'success-maintenance':
             log.info('Repair process completed, but the kernel boots into maintenance mode.')
-            shutil.copyfile(session.attempts[-1].config, f'{input.output}/repaired.config')
+            shutil.copyfile(session.attempts[-1].config, f'{output_dir}/repaired.config')
         else:
             log.error('Repair process failed. Maximum iterations reached without success.')
 
@@ -72,29 +72,21 @@ class Agent:
         dir = f'{session.dir}/attempt_0'
         self.__make_dir(dir)
 
-        attempt = Attempt(
-            id=0,
-            dir=dir,
-            config=session.base,
-        )
+        attempt = Attempt(id=0, dir=dir, config=session.base)
 
-        # Load config
-        if not kernel.load_config(session.base):
-            return attempt
-        
-        # Build
-        attempt.build_log = f'{dir}/build.log'
-        if not kernel.build(attempt.build_log):
+        build = kernel.build(dir, session.base)
+        attempt.build_log = build.log
+        if not build.ok:
             log.info('Build failed with the input configuration.')
             return attempt
-        
-        # Boot
-        attempt.boot_log = f'{dir}/boot.log'
-        attempt.boot_succeeded = kernel.boot(attempt.boot_log)
 
-        if attempt.boot_succeeded == 'yes':
+        boot = kernel.boot(dir)
+        attempt.boot_log = boot.log
+        attempt.boot_succeeded = boot.status
+
+        if boot.status == 'yes':
             log.info('Input configuration boots successfully. No repair needed.')
-        elif attempt.boot_succeeded == 'maintenance':
+        elif boot.status == 'maintenance':
             log.info('Input configuration boots into maintenance mode.')
         else:
             log.info('Input configuration failed to boot.')
@@ -106,82 +98,53 @@ class Agent:
         dir = f'{session.dir}/attempt_{len(session.attempts)}'
         self.__make_dir(dir)
 
-        attempt = Attempt(
-            id=len(session.attempts),
-            dir=dir,
-        )
-
+        attempt = Attempt(id=len(session.attempts), dir=dir)
         session.attempts.append(attempt)
 
-        # Agent
         tools = agent_tools.get(session)
         agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
 
         response = agent.invoke({ 'messages': prompt.prompt(session) })
 
-        token_usage = self.__extract_token_usage(response)
-        attempt.token_usage = token_usage
-        
+        attempt.token_usage = LLMUsage.from_response(response)
         self.__save_raw_response(f'{dir}/raw-agent-response.json', response)
 
-        # Apply Changes
         agent_response = response.get('structured_response', None)
 
         if agent_response is None:
             log.error('Agent failed to provide a structured response. Skipping attempt.')
             return
-        
+
         attempt.response = agent_response
-        
-        if not kernel.load_config(session.base):
+
+        klocalizer = kernel.run_klocalizer(dir, session.base, agent_response.define, agent_response.undefine)
+        attempt.klocalizer_log = klocalizer.log
+        attempt.klocalizer_status = klocalizer.status
+        if klocalizer.status != 'success':
             return
-        
-        self.__apply_and_test(attempt, kernel, agent_response.define, agent_response.undefine)
 
-    def __apply_and_test(self, attempt: Attempt, kernel: Kernel, define: list[str], undefine: list[str]):
-
-        # KLocalizer
-        attempt.klocalizer_log = f'{attempt.dir}/klocalizer.log'
-        attempt.klocalizer_status = kernel.run_klocalizer(attempt.klocalizer_log, define, undefine)
-        if attempt.klocalizer_status != 'success':
-            return
-        
-        attempt.config = f'{attempt.dir}/modified.config'
-
+        attempt.config = f'{dir}/modified.config'
         shutil.copyfile(f'{kernel.src}/.config', attempt.config)
 
-        # Build
-        attempt.build_log = f'{attempt.dir}/build.log'
-        if not kernel.build(attempt.build_log):
+        build = kernel.build(dir, attempt.config)
+        attempt.build_log = build.log
+        if not build.ok:
             return
-        
+
         attempt.build_succeeded = True
 
-        # Boot
-        attempt.boot_log = f'{attempt.dir}/boot.log'
-        attempt.boot_succeeded = kernel.boot(attempt.boot_log)
+        boot = kernel.boot(dir)
+        attempt.boot_log = boot.log
+        attempt.boot_succeeded = boot.status
         
-    def __extract_token_usage(self, response: dict) -> LLMUsage:
-        
-        messages = response.get('messages', [])
-
-        ai_messages = [msg for msg in messages if msg.type == 'ai']
-
-        input_tokens = sum(msg.usage_metadata['input_tokens'] for msg in ai_messages if msg.usage_metadata)
-        output_tokens = sum(msg.usage_metadata['output_tokens'] for msg in ai_messages if msg.usage_metadata)
-        total_tokens = sum(msg.usage_metadata['total_tokens'] for msg in ai_messages if msg.usage_metadata)
-
-        return LLMUsage(input_tokens=input_tokens, output_tokens=output_tokens, total_tokens=total_tokens)
-
     def __save_raw_response(self, path, response: dict):
-        with file_lock:
-            with open(path, 'w') as f:
-                def default(o):
-                    if hasattr(o, "dict"):
-                        return o.dict()
-                    if hasattr(o, "model_dump"):
-                        return o.model_dump()
-                    return str(o)
-                json.dump(response, f, indent=4, default=default)
+        with open(path, 'w') as f:
+            def default(o):
+                if hasattr(o, "dict"):
+                    return o.dict()
+                if hasattr(o, "model_dump"):
+                    return o.model_dump()
+                return str(o)
+            json.dump(response, f, indent=4, default=default)
     
 agent = Agent()

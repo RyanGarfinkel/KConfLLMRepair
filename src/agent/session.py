@@ -1,7 +1,6 @@
 
 from src.models import Attempt, LLMUsage, EmbeddingUsage
-from src.tools import diffconfig
-from src.utils import file_lock
+from src.kernel import diffconfig
 from src.config import settings
 from typing import Tuple
 import time
@@ -88,9 +87,8 @@ class Session:
         return diffconfig.compare(self.base, self.latest)
     
     def save(self, path: str):
-        with file_lock:
-            with open(path, 'w') as f:
-                json.dump(self.__dict__(), f, indent=4)
+        with open(path, 'w') as f:
+            json.dump(self.__dict__(), f, indent=4)
     
     def __dict__(self) -> dict:
 

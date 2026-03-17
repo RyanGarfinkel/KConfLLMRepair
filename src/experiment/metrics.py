@@ -7,32 +7,19 @@ import json
 @singleton
 class SessionMetrics:
 
-	def attempts(self, session: Session) -> int:
-		return len(session.attempts) - 1
+	def load(self, path: str) -> dict:
+		with open(path) as f:
+			data = json.load(f)
 
-	def edit_distance(self, session: Session) -> float:
-		return session.edits[1] if session.edits else -1
-
-	def constraints(self, session: Session) -> dict:
-		return session.constraints
-
-	def duration(self, session: Session) -> float:
-		return session.duration
-
-	def llm_token_usage(self, session: Session) -> dict:
+		summary = data['summary']
 		return {
-			'model': settings.agent.MODEL,
-			'input_tokens': session.token_usage.input_tokens,
-			'output_tokens': session.token_usage.output_tokens,
-			'total_tokens': session.token_usage.total_tokens,
-		}
-
-	def embedding_token_usage(self, session: Session) -> dict:
-		return {
-			'model': settings.agent.EMBEDDING_MODEL if settings.runtime.USE_RAG else None,
-			'build_log_tokens': session.embedding_usage.build_log_tokens,
-			'boot_log_tokens': session.embedding_usage.boot_log_tokens,
-			'total_tokens': session.embedding_usage.total_tokens,
+			'status': summary['status'],
+			'attempts': summary['attempts'],
+			'duration': summary['duration'],
+			'edit_distance': summary['edit_distance'],
+			'constraints': data['constraints'],
+			'llm_token_usage': data['llm_token_usage'],
+			'embedding_token_usage': data['embedding_token_usage'],
 		}
 
 @singleton
@@ -51,7 +38,7 @@ class ExperimentMetrics:
 		successes = [s for s in sessions if s.status in ['success', 'success-maintenance']]
 
 		with file_lock:
-			with open(f'{settings.runtime.SAMPLE_DIR}/results.json', 'w') as f:
+			with open(f'{settings.runtime.OUTPUT_DIR}/results.json', 'w') as f:
 				json.dump({
 					'summary': {
 						'n': n,

@@ -16,7 +16,7 @@ def repair_sample(i: int, sample: Sample, drive: DriveUploader | None = None):
 
     log.info(f'Starting repair for sample {i + 1}...')
 
-    input = get_input(config=sample.original_config, output=f'{settings.runtime.SAMPLE_DIR}/sample_{i}')
+    input = get_input(config=sample.original_config, output=f'{settings.runtime.OUTPUT_DIR}/sample_{i}')
 
     repair_config(input, sample.kernel_src, lambda session: repair_callback(i, session, drive))
 

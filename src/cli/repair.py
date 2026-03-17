@@ -8,7 +8,7 @@ from src.utils import log
 import click
 import os
 
-def get_input(config: str | None = None, original: str | None = None, modified: str | None = None, patch: str | None = None, output: str | None = None) -> Input:
+def get_input(config: str | None = None, original: str | None = None, modified: str | None = None, patch: str | None = None) -> Input:
 
     patched_mode = any(v is not None for v in (original, modified, patch))
 
@@ -22,9 +22,9 @@ def get_input(config: str | None = None, original: str | None = None, modified: 
         raise click.UsageError('--original, --modified, and --patch must be provided.')
 
     if patched_mode:
-        return Input(original_config=original, modified_config=modified, patch=patch, output=output)
-    
-    return Input(original_config=config, output=output)
+        return Input(original_config=original, modified_config=modified, patch=patch)
+
+    return Input(original_config=config)
 
 def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Session], None] | None = None):
 
@@ -34,7 +34,7 @@ def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Se
 
     session = agent.repair(input, kernel)
 
-    log.info(f'See {input.output} for full details of the agent repair attempts.')
+    log.info(f'See {settings.runtime.OUTPUT_DIR} for full details of the agent repair attempts.')
 
     if complete_callback is not None:
         complete_callback(session)
@@ -44,17 +44,19 @@ def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Se
 @click.option('--original', default=None, help='Path to the original (unmodified) config (use with --modified and --patch).')
 @click.option('--modified', default=None, help='Path to the modified config derived from --original.')
 @click.option('--patch', default=None, help='Path to the patch file that produced --modified from --original.')
-@click.option('--output', default=None, help='Path to direct the agent attempts and results, otherwise set to the current working directory.')
+@click.option('--output', '-o', default=os.getcwd(), help='Path to write repair output. Defaults to current working directory.')
 @click.option('--src', default=None, help='Path to the kernel source code, otherwise set to the environment variable KERNEL_SRC.')
 @click.option('--model', '-m', default='gemini-3-pro-preview', help='Model name of you wish to use for repair.')
 @click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
 @click.option('--max-iterations', default=20, help='Maximum number of repair iterations per sample.')
 @click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
 @click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
-def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int, rag: bool, arch: str | None):
+@click.option('--img', default=None, help='Path to the Debian root filesystem image for QEMU. Defaults to $DEBIAN_IMG env var.')
+def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int, rag: bool, arch: str | None, img: str | None):
 
-    input = get_input(config=config, original=original, modified=modified, patch=patch, output=output)
+    input = get_input(config=config, original=original, modified=modified, patch=patch)
 
+    settings.runtime.OUTPUT_DIR = output
     settings.runtime.JOBS = jobs
     settings.runtime.USE_RAG = rag
     settings.agent.MODEL = model
@@ -62,6 +64,9 @@ def main(config: str | None, original: str | None, modified: str | None, patch: 
 
     if arch is not None:
         settings.kernel.ARCH = arch
+
+    if img is not None:
+        settings.kernel.DEBIAN_IMG = img
 
     if src is None:
         src = settings.kernel.KERNEL_SRC

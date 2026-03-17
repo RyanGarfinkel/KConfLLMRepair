@@ -8,7 +8,8 @@ KERNEL_SRC=$1
 BZ_IMG=$2
 LOG_FILE=$3
 ARCH=$4
-TIMEOUT=${5:-300} # 5m Default
+DEBIAN_IMG=$5
+TIMEOUT=${6:-300} # 5m Default
 
 # Variables
 SUCCESS_STRING='login:'
@@ -21,14 +22,14 @@ cd "$WORKING_DIR"
 if [ "$ARCH" = "arm64" ]; then
     qemu-system-aarch64 \
         -M virt \
+        -cpu cortex-a57 \
         -m 2G \
         -smp 2 \
         -kernel "$BZ_IMG" \
         -append "console=ttyAMA0 root=/dev/vda earlyprintk=serial net.ifnames=0" \
         -drive file="$DEBIAN_IMG",format=raw,if=virtio \
         -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22 \
-        -net nic,model=e1000 \
-        -enable-kvm \
+        -net nic,model=virtio \
         -nographic > "$LOG_FILE" 2>&1 &
 else
     qemu-system-x86_64 \
