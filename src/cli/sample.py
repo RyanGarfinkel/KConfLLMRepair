@@ -1,5 +1,5 @@
+from src.config import settings, log_settings
 from src.experiment import sampler
-from src.config import settings
 from src.utils import log
 import click
 
@@ -22,6 +22,7 @@ def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bo
 	settings.runtime.COMMIT_WINDOW = commit_window
 	settings.kernel.ARCH = arch
 
+	log_settings()
 	log.info(f'Starting {mode} sample generation for {n} samples...')
 
 	if mode == 'patch':

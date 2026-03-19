@@ -1,7 +1,7 @@
 from src.experiment import experiment_metrics, session_metrics
-from src.models import Sample
+from src.config import settings, log_settings
 from src.utils import log, dispatcher
-from src.config import settings
+from src.models import Sample
 import click
 import json
 import sys
@@ -29,7 +29,7 @@ def load_samples(output_dir: str) -> list[Sample]:
 	return [Sample(**s) for s in data.get('samples', [])]
 
 def on_sample_complete(i: int, sample: Sample, duration: float):
-	summary_path = f'{sample.sample_dir}/summary.json'
+	summary_path = f'{sample.sample_dir}/agent_repair/summary.json'
 	if not os.path.exists(summary_path):
 		log.error(f'summary.json not found for {sample.sample_dir}')
 		return
@@ -66,6 +66,7 @@ def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: 
 		log.error(f'No samples found in {sampling_json}')
 		return
 
+	log_settings()
 	log.info(f'Found {len(samples)} {mode} samples for {arch}')
 
 	if mode == 'patch':

@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from singleton_decorator import singleton
+from typing import Callable
 from .logger import log
 from tqdm import tqdm
 import subprocess
@@ -10,7 +11,7 @@ import os
 @singleton
 class Dispatcher:
 
-    def run_repairs(self, commands: list[list[str]], log_path: callable | None = None, on_complete: callable | None = None):
+    def run_repairs(self, commands: list[list[str]], log_path: Callable | None = None, on_complete: Callable | None = None):
 
         from src.config import settings
 
@@ -57,7 +58,7 @@ class Dispatcher:
                         submit_next()
                 time.sleep(0.5)
 
-    def run_callables(self, tasks: list[callable]):
+    def run_callables(self, tasks: list[Callable]):
 
         from src.config import settings
         n = len(tasks)

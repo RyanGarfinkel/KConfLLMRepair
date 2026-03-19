@@ -150,12 +150,11 @@ settings = None
 
 try:
     settings = Settings()
+except Exception as e:
+    raise RuntimeError(f'Failed to load configuration: {e}')
 
-    print('[INFO] Configuration initialized successfully.')
-
+def log_settings():
     print(f'[INFO] Using {settings.agent.MODEL}')
     print(f'[INFO] Model from {settings.agent.PROVIDER}')
     print(f'[INFO] kernel-src {settings.kernel.KERNEL_SRC}')
     print(f'[INFO] target arch: {settings.kernel.ARCH}')
-except Exception as e:
-    raise RuntimeError(f'Failed to load configuration: {e}')

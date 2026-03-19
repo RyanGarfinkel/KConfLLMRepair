@@ -1,5 +1,5 @@
+from src.config import settings, log_settings
 from src.core.kernel import Kernel
-from src.config import settings
 from src.models import Input
 from src.core import agent
 from src.utils import log
@@ -50,7 +50,7 @@ def main(config: str | None, original: str | None, modified: str | None, patch: 
 
     input = get_input(config=config, original=original, modified=modified, patch=patch)
 
-    settings.runtime.OUTPUT_DIR = output
+    settings.runtime.OUTPUT_DIR = f'{output}/agent_repair'
     settings.runtime.JOBS = jobs
     settings.runtime.USE_RAG = rag
     settings.agent.MODEL = model
@@ -68,6 +68,7 @@ def main(config: str | None, original: str | None, modified: str | None, patch: 
         raise ValueError(f'Kernel source path {src} does not exist.')
 
     src = os.path.abspath(src)
+    log_settings()
     repair_config(input, src)
 
 if __name__ == '__main__':

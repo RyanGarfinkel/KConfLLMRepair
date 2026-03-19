@@ -227,6 +227,7 @@ class Sampler:
 	def __save(self, summary: dict, completed_samples: list[Sample]):
 
 		with file_lock:
+			os.makedirs(settings.runtime.OUTPUT_DIR, exist_ok=True)
 			with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'w') as f:
 				json.dump({
 					'summary': summary,
