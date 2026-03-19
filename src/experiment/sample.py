@@ -61,7 +61,7 @@ class Sampler:
 					worktree.cleanup(sample.kernel_src)
 
 		tasks = [lambda idx=i: process(idx) for i in range(n)]
-		dispatcher.run_tasks(tasks, desc='Generating samples')
+		dispatcher.run_callables(tasks)
 
 		return summary, completed
 
@@ -131,7 +131,7 @@ class Sampler:
 					worktree.cleanup(sample.kernel_src)
 
 		tasks = [lambda idx=i: process(idx) for i in range(n)]
-		dispatcher.run_tasks(tasks, desc='Generating patch samples')
+		dispatcher.run_callables(tasks)
 
 		return summary, completed
 
