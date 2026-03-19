@@ -1,8 +1,6 @@
 from src.core.kernel import Kernel
 from src.config import settings
-from src.agent import Session
 from src.models import Input
-from typing import Callable
 from src.core import agent
 from src.utils import log
 import click
@@ -26,18 +24,14 @@ def get_input(config: str | None = None, original: str | None = None, modified: 
 
     return Input(original_config=config)
 
-def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Session], None] | None = None):
+def repair_config(input: Input, kernel_src: str):
 
     log.info('Starting agent repair process...')
     
     kernel = Kernel(kernel_src)
-
-    session = agent.repair(input, kernel)
+    agent.repair(input, kernel)
 
     log.info(f'See {settings.runtime.OUTPUT_DIR} for full details of the agent repair attempts.')
-
-    if complete_callback is not None:
-        complete_callback(session)
 
 @click.command()
 @click.option('--config', default=None, help='Path to a configuration file to repair.')
@@ -46,13 +40,13 @@ def repair_config(input: Input, kernel_src: str, complete_callback: Callable[[Se
 @click.option('--patch', default=None, help='Path to the patch file that produced --modified from --original.')
 @click.option('--output', '-o', default=os.getcwd(), help='Path to write repair output. Defaults to current working directory.')
 @click.option('--src', default=None, help='Path to the kernel source code, otherwise set to the environment variable KERNEL_SRC.')
-@click.option('--model', '-m', default='gemini-3-pro-preview', help='Model name of you wish to use for repair.')
+@click.option('--model', '-m', default='gemini-3.1-pro-preview', help='Model name of you wish to use for repair.')
 @click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
-@click.option('--max-iterations', default=20, help='Maximum number of repair iterations per sample.')
+@click.option('--iterations', '-i', default=20, help='Maximum number of attempts to repair the configuration.')
 @click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
 @click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
 @click.option('--img', default=None, help='Path to the Debian root filesystem image for QEMU. Defaults to $DEBIAN_IMG env var.')
-def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, max_iterations: int, rag: bool, arch: str | None, img: str | None):
+def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, iterations: int, rag: bool, arch: str | None, img: str | None):
 
     input = get_input(config=config, original=original, modified=modified, patch=patch)
 
@@ -60,7 +54,7 @@ def main(config: str | None, original: str | None, modified: str | None, patch: 
     settings.runtime.JOBS = jobs
     settings.runtime.USE_RAG = rag
     settings.agent.MODEL = model
-    settings.agent.MAX_ITERATIONS = max_iterations
+    settings.agent.MAX_ITERATIONS = iterations
 
     if arch is not None:
         settings.kernel.ARCH = arch

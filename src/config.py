@@ -52,7 +52,7 @@ class AgentSettings(BaseModel):
     GOOGLE_API_KEY: Optional[str] = Field(default=None)
     OPENAI_API_KEY: Optional[str] = Field(default=None)
     
-    MODEL: str = Field(default='gemini-3-pro-preview')
+    MODEL: str = Field(default='gemini-3.1-pro-preview')
     @property
     def PROVIDER(self) -> str:
         if self.MODEL.startswith('gemini'):

@@ -1,71 +1,92 @@
-from src.experiment import experiment_metrics, DriveUploader, sampler
-from .repair import repair_config, get_input
+from src.experiment import experiment_metrics, session_metrics
+from src.models import Sample
 from src.utils import log, dispatcher
 from src.config import settings
-from src.models import Sample
 import click
+import json
+import sys
+import os
 
-def repair_all(samples: list[Sample], drive: DriveUploader | None = None):
+def build_repair_cmd(sample: Sample, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str) -> list[str]:
+	cmd = [
+		sys.executable, '-m', 'src.cli.repair',
+		'--output', sample.sample_dir,
+		'--model', model,
+		'--jobs', str(jobs),
+		'--iterations', str(iterations),
+		'--arch', arch,
+		'--img', img,
+	]
+	if mode == 'patch':
+		cmd += ['--original', sample.original_config, '--modified', sample.modified_config, '--patch', sample.patch]
+	else:
+		cmd += ['--config', sample.original_config]
+	return cmd
 
-    log.info('Starting repair of all samples...')
+def load_samples(output_dir: str) -> list[Sample]:
+	with open(f'{output_dir}/sampling.json', 'r') as f:
+		data = json.load(f)
+	return [Sample(**s) for s in data.get('samples', [])]
 
-    tasks = [lambda i=i, s=sample: repair_sample(i, s, drive) for i, sample in enumerate(samples)]
-    dispatcher.run_tasks(tasks, desc='Repairing samples')
-
-def repair_sample(i: int, sample: Sample, drive: DriveUploader | None = None):
-
-    log.info(f'Starting repair for sample {i + 1}...')
-
-    input = get_input(config=sample.original_config, output=f'{settings.runtime.OUTPUT_DIR}/sample_{i}')
-
-    repair_config(input, sample.kernel_src, lambda session: repair_callback(i, session, drive))
-
-def repair_callback(i: int, session, drive: DriveUploader | None = None):
-    experiment_metrics.record(i, session)
-    if drive:
-        drive.upload_results_json()
-
-def run_experiment(n: int, skip_generation: bool, skip_repair: bool, drive: DriveUploader | None = None):
-
-    log.info(f'Starting experiment with {n} samples...')
-
-    if skip_generation and not skip_repair:
-        log.info('Reading existing samples from sample folder...')
-        samples = sampler.read_samples(n)
-        repair_all(samples, drive)
-    elif not skip_generation:
-        log.info('Generating new samples...')
-
-        callback = None if skip_repair else lambda i, s: repair_sample(i, s, drive)
-        sampler.random(n, callback)
-    else:
-        log.info('Skipping both sample generation and repair phases.')
+def on_sample_complete(i: int, sample: Sample, duration: float):
+	summary_path = f'{sample.sample_dir}/summary.json'
+	if not os.path.exists(summary_path):
+		log.error(f'summary.json not found for {sample.sample_dir}')
+		return
+	data = session_metrics.load(summary_path)
+	experiment_metrics.record(i, data, duration)
 
 @click.command()
-@click.option('-n', default=10, help='Number of samples to generate.')
-@click.option('--jobs', '-j', default=8, help='Number of parallel jobs to use for building kernels.')
-@click.option('--model', '-m', default='gemini-3-pro-preview', help='Override the default LLM model to use for repair.')
-@click.option('--max-iterations', default=20, help='Maximum number of repair iterations per sample.')
-@click.option('--max-threads', '-t', default=1, help='Maximum number of samples generating at once.')
-@click.option('--skip-generation', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
-@click.option('--skip-repair', is_flag=True, help='Skip the sample generation phase and only perform repair on existing samples.')
-@click.option('--cleanup', is_flag=True, help='Clean up kernel worktrees after processing samples.')
-@click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
-@click.option('--drive', is_flag=True, help='Upload results to Google Drive after each repair.')
-@click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
-def main(n: int, model: str, jobs: int, max_threads: int, max_iterations: int, skip_generation: bool, skip_repair: bool, cleanup: bool, rag: bool, drive: bool, arch: str | None):
+@click.option('--jobs', '-j', default=8, help='Number of parallel jobs for building kernels.')
+@click.option('--threads', '-t', default=1, help='Number of samples to repair in parallel.')
+@click.option('--model', '-m', default='gemini-3.1-pro-preview', help='LLM model to use for repair.')
+@click.option('--iterations', '-i', default=20, help='Maximum repair iterations per sample.')
+@click.option('--arch', '-a', default='x86_64', help='Target architecture (x86_64 or arm64).')
+@click.option('--patch', 'mode', flag_value='patch', help='Use patch-based samples.')
+@click.option('--random', 'mode', flag_value='random', default=True, help='Use random config samples (default).')
+def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: str):
 
-    settings.runtime.MAX_THREADS = max_threads
-    settings.agent.MODEL = model
-    settings.runtime.JOBS = jobs
-    settings.agent.MAX_ITERATIONS = max_iterations
-    settings.runtime.CLEANUP = cleanup
-    settings.runtime.USE_RAG = rag
-    
-    if arch is not None:
-        settings.kernel.ARCH = arch
+	output_dir = f'{settings.runtime.OUTPUT_DIR}/{arch}'
+	settings.runtime.OUTPUT_DIR = output_dir
+	settings.runtime.MAX_THREADS = threads
+	settings.runtime.JOBS = jobs
+	settings.agent.MODEL = model
+	settings.agent.MAX_ITERATIONS = iterations
+	settings.kernel.ARCH = arch
 
-    run_experiment(n, skip_generation, skip_repair, DriveUploader() if drive else None)
+	img = os.environ.get('DEBIAN_IMG_ARM64') if arch == 'arm64' else os.environ.get('DEBIAN_IMG_AMD64', settings.kernel.DEBIAN_IMG)
+
+	sampling_json = f'{output_dir}/sampling.json'
+	if not os.path.exists(sampling_json):
+		log.error(f'No sampling.json found at {sampling_json}')
+		return
+
+	samples = load_samples(output_dir)
+	if not samples:
+		log.error(f'No samples found in {sampling_json}')
+		return
+
+	log.info(f'Found {len(samples)} {mode} samples for {arch}')
+
+	if mode == 'patch':
+		valid = [s for s in samples if s.original_config and s.modified_config and s.patch]
+	else:
+		valid = [s for s in samples if s.original_config]
+
+	skipped = len(samples) - len(valid)
+	if skipped:
+		log.warning(f'Skipping {skipped} sample(s) with incomplete data.')
+
+	commands = [
+		build_repair_cmd(s, model=model, jobs=jobs, iterations=iterations, arch=arch, img=img, mode=mode)
+		for s in valid
+	]
+
+	dispatcher.run_repairs(
+		commands=commands,
+		log_path=lambda i: f'{valid[i].sample_dir}/terminal.log',
+		on_complete=lambda i, duration: on_sample_complete(i, valid[i], duration),
+	)
 
 if __name__ == '__main__':
-    main()
+	main()

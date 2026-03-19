@@ -76,6 +76,7 @@ class Agent:
 
         build = kernel.build(dir, session.base)
         attempt.build_log = build.log
+        attempt.build_time = build.build_time
         if not build.ok:
             log.info('Build failed with the input configuration.')
             return attempt
@@ -128,6 +129,7 @@ class Agent:
 
         build = kernel.build(dir, attempt.config)
         attempt.build_log = build.log
+        attempt.build_time = build.build_time
         if not build.ok:
             return
 

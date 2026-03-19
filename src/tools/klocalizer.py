@@ -16,12 +16,10 @@ class KLocalizer:
 
         with open(f'{parent}/constraints.txt', 'w') as f:
             for option in define:
-                name = option if option.startswith('CONFIG_') else f'CONFIG_{option}'
-                f.write(f'{name}\n')
+                f.write(f'{option}\n')
 
             for option in undefine:
-                name = option if option.startswith('CONFIG_') else f'CONFIG_{option}'
-                f.write(f'!{name}\n')
+                f.write(f'!{option}\n')
 
         cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, f'{parent}/constraints.txt', log, settings.kernel.ARCH]
 

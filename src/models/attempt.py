@@ -16,6 +16,7 @@ class Attempt(BaseModel):
 
     build_succeeded: bool = Field(default=False)
     build_log: str | None = Field(default=None)
+    build_time: float = Field(default=0.0, ge=0)
 
     boot_succeeded: Literal['yes', 'maintenance', 'no'] = Field(default='no')
     boot_log: str | None = Field(default=None)
@@ -36,6 +37,7 @@ class Attempt(BaseModel):
                 'modified_config': self.config,
                 'build_succeeded': self.build_succeeded,
                 'build_log': self.build_log,
+                'build_time': self.build_time,
                 'boot_succeeded': self.boot_succeeded,
                 'boot_log': self.boot_log,
                 'total_token_usage': self.token_usage.total_tokens + self.embedding_usage.total_tokens + total_tool_call_tokens,

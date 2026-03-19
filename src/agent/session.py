@@ -3,7 +3,6 @@ from src.models import Attempt, LLMUsage, EmbeddingUsage
 from src.kernel import diffconfig
 from src.config import settings
 from typing import Tuple
-import time
 import json
 
 class Session:
@@ -14,13 +13,6 @@ class Session:
         self.attempts: list[Attempt] = []
         self.dir = output
         self.patch = patch
-        self.__start_time = time.time()
-        self.end_time: float | None = None
-
-    @property
-    def duration(self) -> float:
-        end = self.end_time if self.end_time is not None else time.time()
-        return round(end - self.__start_time, 2)
 
     @property
     def latest(self) -> str | None:
@@ -55,6 +47,10 @@ class Session:
             output_tokens=sum(a.token_usage.output_tokens for a in self.attempts),
             total_tokens=sum(a.token_usage.total_tokens for a in self.attempts),
         )
+
+    @property
+    def total_build_time(self) -> float:
+        return sum(a.build_time for a in self.attempts)
 
     @property
     def embedding_usage(self) -> EmbeddingUsage:
@@ -104,11 +100,11 @@ class Session:
                 'status': self.status,
                 'arch': settings.kernel.ARCH,
                 'attempts': len(self.attempts) - 1,
-                'duration': self.duration,
                 'original_config': self.base,
                 'repaired_config': repaired_config,
                 'edit_distance': edit_distance,
                 'total_constraints': self.constraints['total'],
+                'total_build_time': self.total_build_time,
             },
             'models': {
                 'llm': settings.agent.MODEL,

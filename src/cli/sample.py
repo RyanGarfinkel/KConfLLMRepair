@@ -11,13 +11,16 @@ import click
 @click.option('--jobs', '-j', default=8, help='Number of parallel jobs to use for building kernels.')
 @click.option('--max-threads', '-t', default=1, help='Maximum number of samples generating at once.')
 @click.option('--cleanup', is_flag=True, default=False, help='Clean up kernel worktrees after sampling.')
-@click.option('--commit-window', default=250, help='Number of commits between start and end commit for patch samples.')
-def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bool, commit_window: int):
+@click.option('--commit-window', default=500, help='Number of commits between start and end commit for patch samples.')
+@click.option('--arch', '-a', default='x86_64', help='Target architecture (x86_64 or arm64).')
+def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bool, commit_window: int, arch: str):
 
+	settings.runtime.OUTPUT_DIR = f'{settings.runtime.OUTPUT_DIR}/{arch}'
 	settings.runtime.MAX_THREADS = max_threads
 	settings.runtime.CLEANUP = cleanup
 	settings.runtime.JOBS = jobs
 	settings.runtime.COMMIT_WINDOW = commit_window
+	settings.kernel.ARCH = arch
 
 	log.info(f'Starting {mode} sample generation for {n} samples...')
 

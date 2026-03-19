@@ -18,14 +18,17 @@ export PROJECT_ROOT=$ROOT
 
 # Core Settings
 export KERNEL_SRC=$ROOT/workspace/kernel
-export BASE_CONFIG=$ROOT/config/base.config ###
 export SAMPLE_DIR=$ROOT/workspace/samples
 export WORKTREE_DIR=$ROOT/workspace/worktrees
+
+# Debian Image
+export DEBIAN_IMG_AMD64=$ROOT/workspace/images/bullseye_amd64.img
+export DEBIAN_IMG_ARM64=$ROOT/workspace/images/bullseye_arm64.img
+export DEBIAN_IMG=$DEBIAN_IMG_AMD64
 
 # Build Settings
 export COMPILER_INSTALL_PATH=$HOME/0day
 export CROSS_COMPILE=x86_64-linux-gnu-
-export DEBIAN_IMG=$ROOT/workspace/images/bullseye.img # $ROOT/workspace/images/debian.raw
 export GOROOT=$HOME/.local/go
 export ARCH=x86_64
 

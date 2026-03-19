@@ -6,6 +6,7 @@ from src.kernel import builder
 from src.utils import log
 from git import Repo
 import shutil
+import time
 import os
 
 class Kernel:
@@ -117,13 +118,17 @@ class Kernel:
         if not self.load_config(config):
             return BuildResult(ok=False, log=log_path)
 
-        if not builder.build(self.src, log_path):
+        start = time.time()
+        ok = builder.build(self.src, log_path)
+        build_time = time.time() - start
+
+        if not ok:
             log.error('Build failed. Check log for details.')
-            return BuildResult(ok=False, log=log_path)
+            return BuildResult(ok=False, log=log_path, build_time=build_time)
 
         log.success('Build completed successfully.')
 
-        return BuildResult(ok=True, log=log_path)
+        return BuildResult(ok=True, log=log_path, build_time=build_time)
 
     def boot(self, dir: str) -> BootResult:
 

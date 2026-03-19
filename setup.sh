@@ -21,9 +21,10 @@ if [ "$SKIP_DEPENDENCIES" != "true" ]; then
         python3 python3-dev python3-pip pipx lz4 \
         git wget unzip xz-utils lftp default-jdk \
         openjdk-8-jdk libz3-java libjson-java sat4j \
-        qemu-system-x86 libdw-dev ccache \
+        qemu-system-x86 qemu-system-arm qemu-user-static libdw-dev ccache \
+        debootstrap debian-archive-keyring \
         clang-18 llvm-18 lld-18 \
-        gcc-x86-64-linux-gnu
+        gcc-x86-64-linux-gnu gcc-aarch64-linux-gnu
 
     sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
     sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-18 100
@@ -54,25 +55,43 @@ echo 'Workspace directrories created successfully.'
 # Kernel Installation
 if [ ! -d 'workspace/kernel' ]; then
     echo '[INFO] Cloning Linux Kernel...'
-    git clone --depth 1 --branch v6.19 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git workspace/kernel
+    git clone --depth 1 --branch v7.0-rc1 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git workspace/kernel
     echo '[SUCCESS] Linux Kernel cloned successfully.'
 else
     echo '[INFO] Linux Kernel already cloned at workspace/kernel'
     echo '[INFO] Pulling latest changes...'
     cd workspace/kernel
-    git fetch --depth 1 origin v6.19
+    git fetch --depth 1 origin v7.0-rc1
     git reset --hard FETCH_HEAD
     echo '[SUCCESS] Linux Kernel updated successfully.'
     cd $ROOT
 fi
 
-# Debian Image Installation
-if [ ! -f 'workspace/images/debian.raw' ]; then
-    echo '[INFO] Downloading Debian image...'
-    wget https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-nocloud-amd64.raw -O workspace/images/debian.raw
-    echo '[SUCCESS] Debian image downloaded successfully.'
+# Debian x86_64 Bullseye Image
+if [ ! -f 'workspace/images/bullseye_amd64.img' ]; then
+    echo '[INFO] Building Debian Bullseye x86_64 image...'
+    cd workspace/images
+    sudo bash $ROOT/workspace/tools/syzkaller/tools/create-image.sh \
+        -d bullseye \
+        -o bullseye_amd64
+    cd $ROOT
+    echo '[SUCCESS] Debian Bullseye x86_64 image created at workspace/images/bullseye_amd64.img'
 else
-    echo '[INFO] Debian image already exists at workspace/images/debian.raw'
+    echo '[INFO] Debian Bullseye x86_64 image already exists at workspace/images/bullseye_amd64.img'
+fi
+
+# Debian arm64 Bullseye Image
+if [ ! -f 'workspace/images/bullseye_arm64.img' ]; then
+    echo '[INFO] Building Debian Bullseye arm64 image...'
+    cd workspace/images
+    sudo bash $ROOT/workspace/tools/syzkaller/tools/create-image.sh \
+        -a aarch64 \
+        -d bullseye \
+        -o bullseye_arm64
+    cd $ROOT
+    echo '[SUCCESS] Debian Bullseye arm64 image created at workspace/images/bullseye_arm64.img'
+else
+    echo '[INFO] Debian Bullseye arm64 image already exists at workspace/images/bullseye_arm64.img'
 fi
 
 # Clang Installation
