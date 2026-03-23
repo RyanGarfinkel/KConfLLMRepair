@@ -1,4 +1,4 @@
-from src.utils import log, dispatcher, file_lock
+from src.utils import log, dispatcher, file_lock, seed_lock
 from singleton_decorator import singleton
 from src.kernel import worktree
 from src.config import settings
@@ -24,6 +24,15 @@ class Sampler:
 		self.__save(summary, [])
 
 		completed = []
+		used_seeds = {s.seed for s in samples}
+
+		def next_seed() -> int:
+			with seed_lock:
+				while True:
+					s = random.randint(1, 100000000)
+					if s not in used_seeds:
+						used_seeds.add(s)
+						return s
 
 		def process(i: int):
 
@@ -37,18 +46,40 @@ class Sampler:
 			)
 
 			try:
-				if os.path.exists(sample.sample_dir):
-					shutil.rmtree(sample.sample_dir)
+				confirmed = False
 
-				os.makedirs(sample.sample_dir, exist_ok=True)
+				for attempt in range(1, 6):
 
-				if not kernel.make_rand_config(f'{sample.sample_dir}/.config', sample.seed):
-					log.error(f'Failed to create random sample {i + 1}.')
+					if attempt > 1:
+						sample.seed = next_seed()
+						log.info(f'Sample {i + 1} booted — retrying with new seed (attempt {attempt}).')
+
+					if os.path.exists(sample.sample_dir):
+						shutil.rmtree(sample.sample_dir)
+
+					os.makedirs(sample.sample_dir, exist_ok=True)
+
+					if not kernel.make_rand_config(f'{sample.sample_dir}/.config', sample.seed):
+						log.error(f'Failed to create random config for sample {i + 1}.')
+						return
+
+					sample.original_config = f'{sample.sample_dir}/.config'
+
+					if not kernel.build(sample.sample_dir, sample.original_config).ok:
+						log.info(f'Sample {i + 1} confirmed non-bootable (build failed).')
+						confirmed = True
+						break
+
+					if kernel.boot(sample.sample_dir).status != 'yes':
+						log.info(f'Sample {i + 1} confirmed non-bootable.')
+						confirmed = True
+						break
+
+				if not confirmed:
+					log.error(f'Sample {i + 1} failed to produce a non-bootable config after 5 attempts.')
 					return
 
-				sample.original_config = f'{sample.sample_dir}/.config'
-				log.info(f'Sample {i + 1} created successfully.')
-
+				log.success(f'Sample {i + 1} created successfully.')
 				completed.append(sample)
 				self.__save(summary, completed)
 
@@ -76,10 +107,12 @@ class Sampler:
 			'n': n,
 		}
 
+		seeds = random.sample(range(1, 100000001), n)
+
 		samples = [
 			Sample(
 				sample_dir=f'{settings.runtime.OUTPUT_DIR}/sample_{i}',
-				seed=random.randint(1, 100000000),
+				seed=seeds[i],
 				kernel_src='',
 				kernel_version='',
 				end_commit=main_repo.head.commit.hexsha,
