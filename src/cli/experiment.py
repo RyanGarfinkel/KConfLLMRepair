@@ -1,16 +1,21 @@
 from src.experiment import experiment_metrics, session_metrics
 from src.config import settings, log_settings
 from src.utils import log, dispatcher
+from src.kernel import worktree
 from src.models import Sample
+from typing import Callable
+import subprocess
 import click
 import json
+import time
 import sys
 import os
 
-def build_repair_cmd(sample: Sample, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str) -> list[str]:
+def build_repair_cmd(sample: Sample, kernel_src: str, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str) -> list[str]:
 	cmd = [
-		sys.executable, '-m', 'src.cli.repair',
+		sys.executable, '-u', '-m', 'src.cli.repair',
 		'--output', sample.sample_dir,
+		'--src', kernel_src,
 		'--model', model,
 		'--jobs', str(jobs),
 		'--iterations', str(iterations),
@@ -28,13 +33,24 @@ def load_samples(output_dir: str) -> list[Sample]:
 		data = json.load(f)
 	return [Sample(**s) for s in data.get('samples', [])]
 
-def on_sample_complete(i: int, sample: Sample, duration: float):
-	summary_path = f'{sample.sample_dir}/agent_repair/summary.json'
-	if not os.path.exists(summary_path):
-		log.error(f'summary.json not found for {sample.sample_dir}')
-		return
-	data = session_metrics.load(summary_path)
-	experiment_metrics.record(i, data, duration)
+def make_task(i: int, s: Sample, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str) -> Callable:
+	def task():
+		start = time.time()
+		kernel_src = worktree.create(s.end_commit)
+		cmd = build_repair_cmd(s, kernel_src=kernel_src, model=model, jobs=jobs, iterations=iterations, arch=arch, img=img, mode=mode)
+		log_file = f'{s.sample_dir}/terminal.log'
+		os.makedirs(os.path.dirname(log_file), exist_ok=True)
+		with open(log_file, 'w', buffering=1) as f:
+			subprocess.run(cmd, stdout=f, stderr=f)
+		duration = round(time.time() - start, 2)
+		summary_path = f'{s.sample_dir}/agent_repair/summary.json'
+		if not os.path.exists(summary_path):
+			log.error(f'summary.json not found for {s.sample_dir}')
+		else:
+			experiment_metrics.record(i, session_metrics.load(summary_path), duration)
+		worktree.cleanup(kernel_src)
+	return task
+
 
 @click.command()
 @click.option('--jobs', '-j', default=8, help='Number of parallel jobs for building kernels.')
@@ -78,15 +94,9 @@ def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: 
 	if skipped:
 		log.warning(f'Skipping {skipped} sample(s) with incomplete data.')
 
-	commands = [
-		build_repair_cmd(s, model=model, jobs=jobs, iterations=iterations, arch=arch, img=img, mode=mode)
-		for s in valid
-	]
-
-	dispatcher.run_repairs(
-		commands=commands,
-		log_path=lambda i: f'{valid[i].sample_dir}/terminal.log',
-		on_complete=lambda i, duration: on_sample_complete(i, valid[i], duration),
+	dispatcher.run_callables(
+		tasks=[make_task(i, s, model, jobs, iterations, arch, img, mode) for i, s in enumerate(valid)],
+		desc='Repairing samples',
 	)
 
 if __name__ == '__main__':

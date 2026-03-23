@@ -88,12 +88,12 @@ class Kernel:
     
     def run_klocalizer(self, dir: str, config: str, define: list[str] = [], undefine: list[str] = [], patch: str | None = None) -> KlocalizerResult:
 
-        log.info('Running KLocalizer...')
-
         log_path = f'{dir}/klocalizer.log'
 
         if not self.load_config(config):
             return KlocalizerResult(status='error', log=log_path)
+
+        log.info('Running KLocalizer...')
 
         if patch is not None:
             status = klocalizer.run_patch(self.src, patch, log_path, define, undefine)
@@ -111,12 +111,12 @@ class Kernel:
 
     def build(self, dir: str, config: str) -> BuildResult:
 
-        log.info('Building kernel...')
-
         log_path = f'{dir}/build.log'
 
         if not self.load_config(config):
             return BuildResult(ok=False, log=log_path)
+
+        log.info('Building kernel...')
 
         start = time.time()
         ok = builder.build(self.src, log_path)
