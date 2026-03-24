@@ -65,12 +65,18 @@ class Sampler:
 
 					sample.original_config = f'{sample.sample_dir}/.config'
 
-					if not kernel.build(sample.sample_dir, sample.original_config).ok:
+					build_result = kernel.build(sample.sample_dir, sample.original_config)
+					sample.built = build_result.ok
+
+					if not build_result.ok:
 						log.info(f'Sample {i + 1} confirmed non-bootable (build failed).')
 						confirmed = True
 						break
 
-					if kernel.boot(sample.sample_dir).status != 'yes':
+					boot_result = kernel.boot(sample.sample_dir)
+					sample.boot_status = boot_result.status
+
+					if boot_result.status != 'yes':
 						log.info(f'Sample {i + 1} confirmed non-bootable.')
 						confirmed = True
 						break
@@ -263,7 +269,12 @@ class Sampler:
 			os.makedirs(settings.runtime.OUTPUT_DIR, exist_ok=True)
 			with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'w') as f:
 				json.dump({
-					'summary': summary,
+					'summary': {
+						**summary,
+						'completed': len(completed_samples),
+						'build_failed': sum(1 for s in completed_samples if s.built is False),
+						'boot_failed': sum(1 for s in completed_samples if s.built and s.boot_status not in ('yes', None)),
+					},
 					'samples': [s.model_dump() for s in completed_samples]
 				}, f, indent=4)
 

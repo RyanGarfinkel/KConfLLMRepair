@@ -2,6 +2,7 @@ from src.config import settings, log_settings
 from src.experiment import sampler
 from src.utils import log
 import click
+import os
 
 @click.command()
 @click.option('-n', default=10, help='Number of samples to generate.')
@@ -21,6 +22,8 @@ def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bo
 	settings.runtime.JOBS = jobs
 	settings.runtime.COMMIT_WINDOW = commit_window
 	settings.kernel.ARCH = arch
+
+	settings.kernel.DEBIAN_IMG = os.environ.get('DEBIAN_IMG_ARM64') if arch == 'arm64' else os.environ.get('DEBIAN_IMG_AMD64', settings.kernel.DEBIAN_IMG)
 
 	log_settings()
 	log.info(f'Starting {mode} sample generation for {n} samples...')

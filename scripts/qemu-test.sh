@@ -5,7 +5,7 @@ WORKING_DIR=$(pwd)
 
 # Input
 KERNEL_SRC=$1
-BZ_IMG=$2
+IMG=$2
 LOG_FILE=$3
 ARCH=$4
 DEBIAN_IMG=$5
@@ -21,24 +21,24 @@ cd "$WORKING_DIR"
 
 if [ "$ARCH" = "arm64" ]; then
     qemu-system-aarch64 \
-        -M virt \
+        -machine virt \
         -cpu cortex-a57 \
+        -nographic \
+        -smp 1 \
+        -drive file="$DEBIAN_IMG",format=raw,file.locking=off \
+        -kernel "$IMG" \
+        -append "console=ttyAMA0 root=/dev/vda oops=panic panic_on_warn=1 panic=-1 ftrace_dump_on_oops=orig_cpu debug earlyprintk=serial slub_debug=UZ" \
         -m 2G \
-        -smp 2 \
-        -kernel "$BZ_IMG" \
-        -append "console=ttyAMA0 earlycon root=/dev/vda net.ifnames=0" \
-        -drive file="$DEBIAN_IMG",format=raw,if=virtio,file.locking=off \
         -net user \
-        -net nic,model=virtio \
-        -nographic > "$LOG_FILE" 2>&1 &
+        -net nic > "$LOG_FILE" 2>&1 &
 else
     qemu-system-x86_64 \
         -m 2G \
         -smp 2 \
-        -kernel "$BZ_IMG" \
+        -kernel "$IMG" \
         -append "console=ttyS0 root=/dev/sda earlyprintk=serial net.ifnames=0" \
-        -drive file="$DEBIAN_IMG",format=raw \
-        -net user,host=10.0.2.10,hostfwd=tcp:127.0.0.1:10022-:22 \
+        -drive file="$DEBIAN_IMG",format=raw,file.locking=off \
+        -net user,host=10.0.2.10 \
         -net nic,model=e1000 \
         -enable-kvm \
         -nographic > "$LOG_FILE" 2>&1 &

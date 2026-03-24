@@ -158,3 +158,4 @@ def log_settings():
     print(f'[INFO] Model from {settings.agent.PROVIDER}')
     print(f'[INFO] kernel-src {settings.kernel.KERNEL_SRC}')
     print(f'[INFO] target arch: {settings.kernel.ARCH}')
+    print(f'[INFO] debian image: {settings.kernel.DEBIAN_IMG}')
