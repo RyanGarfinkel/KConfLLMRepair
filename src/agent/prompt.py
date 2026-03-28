@@ -8,8 +8,7 @@ from .session import Session
 @singleton
 class Prompt:
     
-    @property
-    def system(self) -> SystemMessage:
+    def system(self, session: Session) -> SystemMessage:
 
         if settings.runtime.USE_RAG:
             log_instruction = (
@@ -21,10 +20,20 @@ class Prompt:
         else:
             log_instruction = "Use grep to search logs by pattern, and chunk to retrieve lines around a specific line number."
 
+        hard_constraints = ''
+        if session.hard_define or session.hard_undefine:
+            define_line = f'MUST DEFINE: {session.hard_define}\n' if session.hard_define else ''
+            undefine_line = f'MUST UNDEFINE: {session.hard_undefine}\n' if session.hard_undefine else ''
+            hard_constraints = f"""
+            HARD CONSTRAINTS: In every iteration, you must include the following options in your response exactly as specified.
+            Do not suggest anything that contradicts them.
+            {define_line}{undefine_line}"""
+
         return SystemMessage(content=f"""
             ROLE: You are an expert Linux kernel configuration agent tasked with repairing a non-booting kernel configuration.
             You specialize in reading and understanding build and boot logs, and are knowledgeable about how different configuration
             options impact the build and boot process. The target architecture is {settings.kernel.ARCH}.
+            {hard_constraints}
             WORKFLOW:
             1. You will be given access to query the build and boot logs of the previous attempt, depending on availability.
             If the latest klocalizer attempt did not succeed, the build and boot logs will be unavailable. If the latest build
@@ -88,6 +97,6 @@ class Prompt:
         """
     
     def prompt(self, session: Session) -> list[BaseMessage]:
-        return [self.system, self.user(session)]
+        return [self.system(session), self.user(session)]
     
 prompt = Prompt()

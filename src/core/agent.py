@@ -23,7 +23,7 @@ class Agent:
         output_dir = settings.runtime.OUTPUT_DIR
         self.__make_dir(output_dir)
 
-        session = Session(input.original_config, output_dir, patch=input.patch)
+        session = Session(input.original_config, output_dir, patch=input.patch, hard_define=input.define, hard_undefine=input.undefine)
         llm = model.get_llm()
 
         inital_attempt = self.__inital_attempt(kernel, session)
@@ -118,7 +118,9 @@ class Agent:
 
         attempt.response = agent_response
 
-        klocalizer = kernel.run_klocalizer(dir, session.base, agent_response.define, agent_response.undefine)
+        define, undefine = self.__apply_hard_constraints(agent_response.define, agent_response.undefine, session.hard_define, session.hard_undefine)
+
+        klocalizer = kernel.run_klocalizer(dir, session.base, define, undefine)
         attempt.klocalizer_log = klocalizer.log
         attempt.klocalizer_status = klocalizer.status
         if klocalizer.status != 'success':
@@ -139,6 +141,13 @@ class Agent:
         attempt.boot_log = boot.log
         attempt.boot_succeeded = boot.status
         
+    def __apply_hard_constraints(self, define: list[str], undefine: list[str], hard_define: set[str], hard_undefine: set[str]) -> tuple[list[str], list[str]]:
+        
+        define = list((set(define) - hard_undefine) | hard_define)
+        undefine = list((set(undefine) - hard_define) | hard_undefine)
+
+        return define, undefine
+
     def __save_raw_response(self, path, response: dict):
         with open(path, 'w') as f:
             def default(o):
@@ -146,7 +155,9 @@ class Agent:
                     return o.dict()
                 if hasattr(o, "model_dump"):
                     return o.model_dump()
+                
                 return str(o)
+
             json.dump(response, f, indent=4, default=default)
     
 agent = Agent()

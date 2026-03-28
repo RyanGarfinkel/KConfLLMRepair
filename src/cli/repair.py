@@ -6,7 +6,7 @@ from src.utils import log
 import click
 import os
 
-def get_input(config: str | None = None, original: str | None = None, modified: str | None = None, patch: str | None = None) -> Input:
+def get_input(config: str | None = None, original: str | None = None, modified: str | None = None, patch: str | None = None, constraints: str | None = None) -> Input:
 
     patched_mode = any(v is not None for v in (original, modified, patch))
 
@@ -20,9 +20,9 @@ def get_input(config: str | None = None, original: str | None = None, modified: 
         raise click.UsageError('--original, --modified, and --patch must be provided.')
 
     if patched_mode:
-        return Input(original_config=original, modified_config=modified, patch=patch)
+        return Input(original_config=original, modified_config=modified, patch=patch, hard_constraints=constraints)
 
-    return Input(original_config=config)
+    return Input(original_config=config, hard_constraints=constraints)
 
 def repair_config(input: Input, kernel_src: str):
 
@@ -46,9 +46,10 @@ def repair_config(input: Input, kernel_src: str):
 @click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
 @click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
 @click.option('--img', default=None, help='Path to the Debian root filesystem image for QEMU. Defaults to $DEBIAN_IMG env var.')
-def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, iterations: int, rag: bool, arch: str | None, img: str | None):
+@click.option('--constraints', default=None, help='Path to a hard constraints file.')
+def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, iterations: int, rag: bool, arch: str | None, img: str | None, constraints: str | None):
 
-    input = get_input(config=config, original=original, modified=modified, patch=patch)
+    input = get_input(config=config, original=original, modified=modified, patch=patch, constraints=constraints)
 
     settings.runtime.OUTPUT_DIR = f'{output}/agent_repair'
     settings.runtime.JOBS = jobs
