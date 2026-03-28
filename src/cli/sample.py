@@ -4,6 +4,25 @@ from src.utils import log
 import click
 import os
 
+def parse_constraints(path: str) -> tuple[set[str], set[str]]:
+	if not os.path.exists(path):
+		raise click.UsageError(f'Constraints file not found: {path}')
+
+	hard_define: set[str] = set()
+	hard_undefine: set[str] = set()
+
+	with open(os.path.abspath(path)) as f:
+		for line in f:
+			line = line.strip()
+			if not line:
+				continue
+			if line.startswith('!'):
+				hard_undefine.add(line[1:])
+			else:
+				hard_define.add(line)
+
+	return hard_define, hard_undefine
+
 @click.command()
 @click.option('-n', default=10, help='Number of samples to generate.')
 @click.option('--patch', 'mode', flag_value='patch', help='Generate patch-based samples.')
@@ -14,7 +33,8 @@ import os
 @click.option('--cleanup', is_flag=True, default=False, help='Clean up kernel worktrees after sampling.')
 @click.option('--commit-window', default=500, help='Number of commits between start and end commit for patch samples.')
 @click.option('--arch', '-a', default='x86_64', help='Target architecture (x86_64 or arm64).')
-def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bool, commit_window: int, arch: str):
+@click.option('--constraints', default=None, help='Path to a hard constraints file (OPTION to define, !OPTION to undefine).')
+def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bool, commit_window: int, arch: str, constraints: str | None):
 
 	settings.runtime.OUTPUT_DIR = f'{settings.runtime.OUTPUT_DIR}/{arch}'
 	settings.runtime.MAX_THREADS = max_threads
@@ -28,10 +48,12 @@ def main(n: int, mode: str, since: str, jobs: int, max_threads: int, cleanup: bo
 	log_settings()
 	log.info(f'Starting {mode} sample generation for {n} samples...')
 
+	hard_define, hard_undefine = parse_constraints(constraints) if constraints else (set(), set())
+
 	if mode == 'patch':
-		sampler.patch(n, since)
+		sampler.patch(n, since, hard_define, hard_undefine)
 	else:
-		sampler.random(n)
+		sampler.random(n, hard_define, hard_undefine)
 
 	log.info('Sample generation completed.')
 
