@@ -1,5 +1,5 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
+from langchain_core.documents import Document
 from src.utils import embedding_lock
 from src.config import settings
 from typing import Literal
@@ -85,8 +85,8 @@ class LogSearch:
             keep_separator=True,
         )
 
-        loader = TextLoader(self.path, encoding='utf-8', autodetect_encoding=True)
-        docs = loader.load()
+        with open(self.path, encoding='utf-8', errors='replace') as f:
+            docs = [Document(page_content=f.read())]
 
         splits = splitter.split_documents(docs)
         self.chunks = [split.page_content for split in splits]

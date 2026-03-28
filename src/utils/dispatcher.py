@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from singleton_decorator import singleton
+from typing import Callable
 from .logger import log
 from tqdm import tqdm
 import traceback
@@ -7,10 +8,9 @@ import traceback
 @singleton
 class Dispatcher:
 
-    def run_tasks(self, tasks: list[callable], desc: str = 'Running tasks'):
+    def run_callables(self, tasks: list[Callable], desc: str = 'Running tasks'):
 
         from src.config import settings
-
         n = len(tasks)
         max_workers = settings.runtime.MAX_THREADS
 
@@ -39,7 +39,7 @@ class Dispatcher:
                             log.error(f'Traceback:\n{"".join(traceback.format_exception(type(e), e, e.__traceback__))}')
 
                         completed += 1
-                        pbar.set_description(f'{desc} {completed} / {n}')
+                        pbar.set_description(f'Generating samples {completed} / {n}')
                         pbar.update(1)
                         submit_next()
                         break

@@ -5,6 +5,15 @@ class LLMUsage(BaseModel):
 	output_tokens: int = Field(..., frozen=True)
 	total_tokens: int = Field(..., frozen=True)
 
+	@classmethod
+	def from_response(cls, response: dict) -> 'LLMUsage':
+		ai_messages = [msg for msg in response.get('messages', []) if msg.type == 'ai']
+		return cls(
+			input_tokens=sum(msg.usage_metadata['input_tokens'] for msg in ai_messages if msg.usage_metadata),
+			output_tokens=sum(msg.usage_metadata['output_tokens'] for msg in ai_messages if msg.usage_metadata),
+			total_tokens=sum(msg.usage_metadata['total_tokens'] for msg in ai_messages if msg.usage_metadata),
+		)
+
 	def model_dump(self) -> dict:
 		return {
 			'input_tokens': self.input_tokens,

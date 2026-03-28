@@ -6,9 +6,17 @@ import os
 class KernelSettings(BaseModel):
 
     KERNEL_SRC: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'kernel')))
-    BZIMAGE: str = Field(default='arch/x86/boot/bzImage', frozen=True)
+    DEBIAN_IMG: str = Field(default='')
+    ARCH: str = Field(default='x86_64')
+    CROSS_COMPILE: str = Field(default='')
     SYZKCONF_INSTANCE: str = Field(default='upstream-apparmor-kasan', frozen=True)
     DIFFCONFIG: str = Field(default='scripts/diffconfig', frozen=True)
+
+    @property
+    def BZIMAGE(self) -> str:
+        if self.ARCH == 'arm64':
+            return 'arch/arm64/boot/Image'
+        return 'arch/x86/boot/bzImage'
 
     @property
     def WORKTREE_DIR(self) -> str:
@@ -30,9 +38,9 @@ class RuntimeSettings(BaseModel):
     CLEANUP: bool = Field(default=False)
     USE_RAG: bool = Field(default=False)
 
-    SAMPLE_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
+    OUTPUT_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
 
-    @field_validator('SAMPLE_DIR')
+    @field_validator('OUTPUT_DIR')
     def validate(cls, v: str) -> str:
         if v:
             os.makedirs(v, exist_ok=True)
@@ -44,7 +52,7 @@ class AgentSettings(BaseModel):
     GOOGLE_API_KEY: Optional[str] = Field(default=None)
     OPENAI_API_KEY: Optional[str] = Field(default=None)
     
-    MODEL: str = Field(default='gemini-3-pro-preview')
+    MODEL: str = Field(default='gemini-3.1-pro-preview')
     @property
     def PROVIDER(self) -> str:
         if self.MODEL.startswith('gemini'):
@@ -63,7 +71,7 @@ class AgentSettings(BaseModel):
         else:
             raise ValueError(f'Unknown embedding model for provider: {self.PROVIDER}')
 
-    MAX_ITERATIONS: int = Field(default=5, ge=1)
+    MAX_ITERATIONS: int = Field(default=20, ge=1)
     MAX_TOOL_CALLS: int = Field(default=20, ge=1)
     MAX_MATCHES: int = 5
 
@@ -94,6 +102,11 @@ class ScriptSettings(BaseModel):
     @property
     def RUN_KLOCALIZER_SCRIPT(self) -> str:
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-klocalizer.sh')
+        return os.path.abspath(path)
+
+    @property
+    def RUN_KLOCALIZER_PATCH_SCRIPT(self) -> str:
+        path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-klocalizer-patch.sh')
         return os.path.abspath(path)
     
     @property
@@ -137,11 +150,12 @@ settings = None
 
 try:
     settings = Settings()
+except Exception as e:
+    raise RuntimeError(f'Failed to load configuration: {e}')
 
-    print('[INFO] Configuration initialized successfully.')
-
+def log_settings():
     print(f'[INFO] Using {settings.agent.MODEL}')
     print(f'[INFO] Model from {settings.agent.PROVIDER}')
     print(f'[INFO] kernel-src {settings.kernel.KERNEL_SRC}')
-except Exception as e:
-    raise RuntimeError(f'Failed to load configuration: {e}')
+    print(f'[INFO] target arch: {settings.kernel.ARCH}')
+    print(f'[INFO] debian image: {settings.kernel.DEBIAN_IMG}')

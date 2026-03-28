@@ -1,18 +1,18 @@
 
 from src.models import Attempt, LLMUsage, EmbeddingUsage
-from src.tools import diffconfig
-from src.utils import file_lock
+from src.kernel import diffconfig
 from src.config import settings
 from typing import Tuple
 import json
 
 class Session:
     
-    def __init__(self, config: str, output: str):
+    def __init__(self, config: str, output: str, patch: str | None = None):
 
         self.base = config
         self.attempts: list[Attempt] = []
         self.dir = output
+        self.patch = patch
 
     @property
     def latest(self) -> str | None:
@@ -49,6 +49,10 @@ class Session:
         )
 
     @property
+    def total_build_time(self) -> float:
+        return sum(a.build_time for a in self.attempts)
+
+    @property
     def embedding_usage(self) -> EmbeddingUsage:
         return EmbeddingUsage(
             build_log_tokens=sum(a.embedding_usage.build_log_tokens for a in self.attempts),
@@ -79,9 +83,8 @@ class Session:
         return diffconfig.compare(self.base, self.latest)
     
     def save(self, path: str):
-        with file_lock:
-            with open(path, 'w') as f:
-                json.dump(self.__dict__(), f, indent=4)
+        with open(path, 'w') as f:
+            json.dump(self.__dict__(), f, indent=4)
     
     def __dict__(self) -> dict:
 
@@ -95,11 +98,13 @@ class Session:
         return {
             'summary': {
                 'status': self.status,
+                'arch': settings.kernel.ARCH,
                 'attempts': len(self.attempts) - 1,
                 'original_config': self.base,
                 'repaired_config': repaired_config,
                 'edit_distance': edit_distance,
                 'total_constraints': self.constraints['total'],
+                'total_build_time': self.total_build_time,
             },
             'models': {
                 'llm': settings.agent.MODEL,

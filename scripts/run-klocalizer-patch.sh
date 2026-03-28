@@ -4,9 +4,10 @@ WORKING_DIR=$(pwd)
 
 # Input
 KERNEL_SRC=$1
-CONSTRAINTS_FILE=$2
+PATCH_FILE=$2
 LOG_FILE=$3
-ARCH=${4}
+ARCH=$4
+EXTRA_ARGS=("${@:5}")
 
 # Validate Dependencies
 if [ -z "$SUPERC_PATH" ] || [ ! -f "$SUPERC_PATH" ]; then
@@ -19,8 +20,8 @@ if [ -z "$ARCH" ]; then
     exit 1
 fi
 
-if [ ! -f "$CONSTRAINTS_FILE" ]; then
-    echo "[ERROR] Constraints file $CONSTRAINTS_FILE does not exist." > "$LOG_FILE"
+if [ ! -f "$PATCH_FILE" ]; then
+    echo "[ERROR] Patch file $PATCH_FILE does not exist." > "$LOG_FILE"
     exit 1
 fi
 
@@ -31,7 +32,8 @@ rm -f "$LOG_FILE"
 LLVM=1 CC="clang -fintegrated-as" LD=ld.lld \
         klocalizer -a $ARCH \
         --repair "$KERNEL_SRC/.config" \
-        --config-mutex-file $CONSTRAINTS_FILE > "$LOG_FILE" 2>&1
+        --include-mutex $PATCH_FILE \
+        "${EXTRA_ARGS[@]}" > "$LOG_FILE" 2>&1
         
 KLOCALIZER_EXIT=$?
 

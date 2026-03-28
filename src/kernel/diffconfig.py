@@ -9,7 +9,7 @@ class DiffConfig:
 
     def compare(self, base_config: str, modified_config: str) -> tuple[list[str], int]:
 
-        diffconfig_path = os.path.join(settings.kernel.KERNEL_SRC, settings.kernel.DIFFCONFIG)
+        diffconfig_path = f'{settings.kernel.KERNEL_SRC}/{settings.kernel.DIFFCONFIG}'
 
         cmd = [diffconfig_path, base_config, modified_config]
 

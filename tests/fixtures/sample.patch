@@ -1,0 +1,576 @@
+diff --git a/Makefile b/Makefile
+index bde507d5c..d3a8482bd 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2,7 +2,7 @@
+ VERSION = 6
+ PATCHLEVEL = 19
+ SUBLEVEL = 0
+-EXTRAVERSION = -rc8
++EXTRAVERSION =
+ NAME = Baby Opossum Posse
+ 
+ # *DOCUMENTATION*
+diff --git a/drivers/android/binder.c b/drivers/android/binder.c
+index 535fc881c..b356c9b88 100644
+--- a/drivers/android/binder.c
++++ b/drivers/android/binder.c
+@@ -2991,6 +2991,10 @@ static void binder_set_txn_from_error(struct binder_transaction *t, int id,
+  * @t:		the binder transaction that failed
+  * @data_size:	the user provided data size for the transaction
+  * @error:	enum binder_driver_return_protocol returned to sender
++ *
++ * Note that t->buffer is not safe to access here, as it may have been
++ * released (or not yet allocated). Callers should guarantee all the
++ * transaction items used here are safe to access.
+  */
+ static void binder_netlink_report(struct binder_proc *proc,
+ 				  struct binder_transaction *t,
+@@ -3780,6 +3784,14 @@ static void binder_transaction(struct binder_proc *proc,
+ 			goto err_dead_proc_or_thread;
+ 		}
+ 	} else {
++		/*
++		 * Make a transaction copy. It is not safe to access 't' after
++		 * binder_proc_transaction() reported a pending frozen. The
++		 * target could thaw and consume the transaction at any point.
++		 * Instead, use a safe 't_copy' for binder_netlink_report().
++		 */
++		struct binder_transaction t_copy = *t;
++
+ 		BUG_ON(target_node == NULL);
+ 		BUG_ON(t->buffer->async_transaction != 1);
+ 		return_error = binder_proc_transaction(t, target_proc, NULL);
+@@ -3790,7 +3802,7 @@ static void binder_transaction(struct binder_proc *proc,
+ 		 */
+ 		if (return_error == BR_TRANSACTION_PENDING_FROZEN) {
+ 			tcomplete->type = BINDER_WORK_TRANSACTION_PENDING;
+-			binder_netlink_report(proc, t, tr->data_size,
++			binder_netlink_report(proc, &t_copy, tr->data_size,
+ 					      return_error);
+ 		}
+ 		binder_enqueue_thread_work(thread, tcomplete);
+@@ -3812,8 +3824,9 @@ static void binder_transaction(struct binder_proc *proc,
+ 	return;
+ 
+ err_dead_proc_or_thread:
+-	binder_txn_error("%d:%d dead process or thread\n",
+-		thread->pid, proc->pid);
++	binder_txn_error("%d:%d %s process or thread\n",
++			 proc->pid, thread->pid,
++			 return_error == BR_FROZEN_REPLY ? "frozen" : "dead");
+ 	return_error_line = __LINE__;
+ 	binder_dequeue_work(proc, tcomplete);
+ err_translate_failed:
+diff --git a/drivers/android/binder/rust_binderfs.c b/drivers/android/binder/rust_binderfs.c
+index e36011e89..5c1319d80 100644
+--- a/drivers/android/binder/rust_binderfs.c
++++ b/drivers/android/binder/rust_binderfs.c
+@@ -132,8 +132,8 @@ static int binderfs_binder_device_create(struct inode *ref_inode,
+ 	mutex_lock(&binderfs_minors_mutex);
+ 	if (++info->device_count <= info->mount_opts.max)
+ 		minor = ida_alloc_max(&binderfs_minors,
+-				      use_reserve ? BINDERFS_MAX_MINOR :
+-						    BINDERFS_MAX_MINOR_CAPPED,
++				      use_reserve ? BINDERFS_MAX_MINOR - 1 :
++						    BINDERFS_MAX_MINOR_CAPPED - 1,
+ 				      GFP_KERNEL);
+ 	else
+ 		minor = -ENOSPC;
+@@ -399,8 +399,8 @@ static int binderfs_binder_ctl_create(struct super_block *sb)
+ 	/* Reserve a new minor number for the new device. */
+ 	mutex_lock(&binderfs_minors_mutex);
+ 	minor = ida_alloc_max(&binderfs_minors,
+-			      use_reserve ? BINDERFS_MAX_MINOR :
+-					    BINDERFS_MAX_MINOR_CAPPED,
++			      use_reserve ? BINDERFS_MAX_MINOR - 1 :
++					    BINDERFS_MAX_MINOR_CAPPED - 1,
+ 			      GFP_KERNEL);
+ 	mutex_unlock(&binderfs_minors_mutex);
+ 	if (minor < 0) {
+diff --git a/drivers/android/binder/thread.rs b/drivers/android/binder/thread.rs
+index 1a8e6fdc0..e0ea33ccf 100644
+--- a/drivers/android/binder/thread.rs
++++ b/drivers/android/binder/thread.rs
+@@ -39,6 +39,10 @@
+     sync::atomic::{AtomicU32, Ordering},
+ };
+ 
++fn is_aligned(value: usize, to: usize) -> bool {
++    value % to == 0
++}
++
+ /// Stores the layout of the scatter-gather entries. This is used during the `translate_objects`
+ /// call and is discarded when it returns.
+ struct ScatterGatherState {
+@@ -69,17 +73,24 @@ struct ScatterGatherEntry {
+ }
+ 
+ /// This entry specifies that a fixup should happen at `target_offset` of the
+-/// buffer. If `skip` is nonzero, then the fixup is a `binder_fd_array_object`
+-/// and is applied later. Otherwise if `skip` is zero, then the size of the
+-/// fixup is `sizeof::<u64>()` and `pointer_value` is written to the buffer.
+-struct PointerFixupEntry {
+-    /// The number of bytes to skip, or zero for a `binder_buffer_object` fixup.
+-    skip: usize,
+-    /// The translated pointer to write when `skip` is zero.
+-    pointer_value: u64,
+-    /// The offset at which the value should be written. The offset is relative
+-    /// to the original buffer.
+-    target_offset: usize,
++/// buffer.
++enum PointerFixupEntry {
++    /// A fixup for a `binder_buffer_object`.
++    Fixup {
++        /// The translated pointer to write.
++        pointer_value: u64,
++        /// The offset at which the value should be written. The offset is relative
++        /// to the original buffer.
++        target_offset: usize,
++    },
++    /// A skip for a `binder_fd_array_object`.
++    Skip {
++        /// The number of bytes to skip.
++        skip: usize,
++        /// The offset at which the skip should happen. The offset is relative
++        /// to the original buffer.
++        target_offset: usize,
++    },
+ }
+ 
+ /// Return type of `apply_and_validate_fixup_in_parent`.
+@@ -762,8 +773,7 @@ fn translate_object(
+ 
+                     parent_entry.fixup_min_offset = info.new_min_offset;
+                     parent_entry.pointer_fixups.push(
+-                        PointerFixupEntry {
+-                            skip: 0,
++                        PointerFixupEntry::Fixup {
+                             pointer_value: buffer_ptr_in_user_space,
+                             target_offset: info.target_offset,
+                         },
+@@ -789,6 +799,10 @@ fn translate_object(
+                 let num_fds = usize::try_from(obj.num_fds).map_err(|_| EINVAL)?;
+                 let fds_len = num_fds.checked_mul(size_of::<u32>()).ok_or(EINVAL)?;
+ 
++                if !is_aligned(parent_offset, size_of::<u32>()) {
++                    return Err(EINVAL.into());
++                }
++
+                 let info = sg_state.validate_parent_fixup(parent_index, parent_offset, fds_len)?;
+                 view.alloc.info_add_fd_reserve(num_fds)?;
+ 
+@@ -803,13 +817,16 @@ fn translate_object(
+                     }
+                 };
+ 
++                if !is_aligned(parent_entry.sender_uaddr, size_of::<u32>()) {
++                    return Err(EINVAL.into());
++                }
++
+                 parent_entry.fixup_min_offset = info.new_min_offset;
+                 parent_entry
+                     .pointer_fixups
+                     .push(
+-                        PointerFixupEntry {
++                        PointerFixupEntry::Skip {
+                             skip: fds_len,
+-                            pointer_value: 0,
+                             target_offset: info.target_offset,
+                         },
+                         GFP_KERNEL,
+@@ -820,6 +837,7 @@ fn translate_object(
+                     .sender_uaddr
+                     .checked_add(parent_offset)
+                     .ok_or(EINVAL)?;
++
+                 let mut fda_bytes = KVec::new();
+                 UserSlice::new(UserPtr::from_addr(fda_uaddr as _), fds_len)
+                     .read_all(&mut fda_bytes, GFP_KERNEL)?;
+@@ -871,17 +889,21 @@ fn apply_sg(&self, alloc: &mut Allocation, sg_state: &mut ScatterGatherState) ->
+             let mut reader =
+                 UserSlice::new(UserPtr::from_addr(sg_entry.sender_uaddr), sg_entry.length).reader();
+             for fixup in &mut sg_entry.pointer_fixups {
+-                let fixup_len = if fixup.skip == 0 {
+-                    size_of::<u64>()
+-                } else {
+-                    fixup.skip
++                let (fixup_len, fixup_offset) = match fixup {
++                    PointerFixupEntry::Fixup { target_offset, .. } => {
++                        (size_of::<u64>(), *target_offset)
++                    }
++                    PointerFixupEntry::Skip {
++                        skip,
++                        target_offset,
++                    } => (*skip, *target_offset),
+                 };
+ 
+-                let target_offset_end = fixup.target_offset.checked_add(fixup_len).ok_or(EINVAL)?;
+-                if fixup.target_offset < end_of_previous_fixup || offset_end < target_offset_end {
++                let target_offset_end = fixup_offset.checked_add(fixup_len).ok_or(EINVAL)?;
++                if fixup_offset < end_of_previous_fixup || offset_end < target_offset_end {
+                     pr_warn!(
+                         "Fixups oob {} {} {} {}",
+-                        fixup.target_offset,
++                        fixup_offset,
+                         end_of_previous_fixup,
+                         offset_end,
+                         target_offset_end
+@@ -890,13 +912,13 @@ fn apply_sg(&self, alloc: &mut Allocation, sg_state: &mut ScatterGatherState) ->
+                 }
+ 
+                 let copy_off = end_of_previous_fixup;
+-                let copy_len = fixup.target_offset - end_of_previous_fixup;
++                let copy_len = fixup_offset - end_of_previous_fixup;
+                 if let Err(err) = alloc.copy_into(&mut reader, copy_off, copy_len) {
+                     pr_warn!("Failed copying into alloc: {:?}", err);
+                     return Err(err.into());
+                 }
+-                if fixup.skip == 0 {
+-                    let res = alloc.write::<u64>(fixup.target_offset, &fixup.pointer_value);
++                if let PointerFixupEntry::Fixup { pointer_value, .. } = fixup {
++                    let res = alloc.write::<u64>(fixup_offset, pointer_value);
+                     if let Err(err) = res {
+                         pr_warn!("Failed copying ptr into alloc: {:?}", err);
+                         return Err(err.into());
+@@ -949,25 +971,30 @@ pub(crate) fn copy_transaction_data(
+ 
+         let data_size = trd.data_size.try_into().map_err(|_| EINVAL)?;
+         let aligned_data_size = ptr_align(data_size).ok_or(EINVAL)?;
+-        let offsets_size = trd.offsets_size.try_into().map_err(|_| EINVAL)?;
+-        let aligned_offsets_size = ptr_align(offsets_size).ok_or(EINVAL)?;
+-        let buffers_size = tr.buffers_size.try_into().map_err(|_| EINVAL)?;
+-        let aligned_buffers_size = ptr_align(buffers_size).ok_or(EINVAL)?;
++        let offsets_size: usize = trd.offsets_size.try_into().map_err(|_| EINVAL)?;
++        let buffers_size: usize = tr.buffers_size.try_into().map_err(|_| EINVAL)?;
+         let aligned_secctx_size = match secctx.as_ref() {
+             Some((_offset, ctx)) => ptr_align(ctx.len()).ok_or(EINVAL)?,
+             None => 0,
+         };
+ 
++        if !is_aligned(offsets_size, size_of::<u64>()) {
++            return Err(EINVAL.into());
++        }
++        if !is_aligned(buffers_size, size_of::<u64>()) {
++            return Err(EINVAL.into());
++        }
++
+         // This guarantees that at least `sizeof(usize)` bytes will be allocated.
+         let len = usize::max(
+             aligned_data_size
+-                .checked_add(aligned_offsets_size)
+-                .and_then(|sum| sum.checked_add(aligned_buffers_size))
++                .checked_add(offsets_size)
++                .and_then(|sum| sum.checked_add(buffers_size))
+                 .and_then(|sum| sum.checked_add(aligned_secctx_size))
+                 .ok_or(ENOMEM)?,
+-            size_of::<usize>(),
++            size_of::<u64>(),
+         );
+-        let secctx_off = aligned_data_size + aligned_offsets_size + aligned_buffers_size;
++        let secctx_off = aligned_data_size + offsets_size + buffers_size;
+         let mut alloc =
+             match to_process.buffer_alloc(debug_id, len, is_oneway, self.process.task.pid()) {
+                 Ok(alloc) => alloc,
+@@ -999,13 +1026,13 @@ pub(crate) fn copy_transaction_data(
+             }
+ 
+             let offsets_start = aligned_data_size;
+-            let offsets_end = aligned_data_size + aligned_offsets_size;
++            let offsets_end = aligned_data_size + offsets_size;
+ 
+             // This state is used for BINDER_TYPE_PTR objects.
+             let sg_state = sg_state.insert(ScatterGatherState {
+                 unused_buffer_space: UnusedBufferSpace {
+                     offset: offsets_end,
+-                    limit: len,
++                    limit: offsets_end + buffers_size,
+                 },
+                 sg_entries: KVec::new(),
+                 ancestors: KVec::new(),
+@@ -1014,12 +1041,16 @@ pub(crate) fn copy_transaction_data(
+             // Traverse the objects specified.
+             let mut view = AllocationView::new(&mut alloc, data_size);
+             for (index, index_offset) in (offsets_start..offsets_end)
+-                .step_by(size_of::<usize>())
++                .step_by(size_of::<u64>())
+                 .enumerate()
+             {
+-                let offset = view.alloc.read(index_offset)?;
++                let offset: usize = view
++                    .alloc
++                    .read::<u64>(index_offset)?
++                    .try_into()
++                    .map_err(|_| EINVAL)?;
+ 
+-                if offset < end_of_previous_object {
++                if offset < end_of_previous_object || !is_aligned(offset, size_of::<u32>()) {
+                     pr_warn!("Got transaction with invalid offset.");
+                     return Err(EINVAL.into());
+                 }
+@@ -1051,7 +1082,7 @@ pub(crate) fn copy_transaction_data(
+                 }
+ 
+                 // Update the indexes containing objects to clean up.
+-                let offset_after_object = index_offset + size_of::<usize>();
++                let offset_after_object = index_offset + size_of::<u64>();
+                 view.alloc
+                     .set_info_offsets(offsets_start..offset_after_object);
+             }
+diff --git a/drivers/android/binderfs.c b/drivers/android/binderfs.c
+index b46bcb910..9f8a18c88 100644
+--- a/drivers/android/binderfs.c
++++ b/drivers/android/binderfs.c
+@@ -132,8 +132,8 @@ static int binderfs_binder_device_create(struct inode *ref_inode,
+ 	mutex_lock(&binderfs_minors_mutex);
+ 	if (++info->device_count <= info->mount_opts.max)
+ 		minor = ida_alloc_max(&binderfs_minors,
+-				      use_reserve ? BINDERFS_MAX_MINOR :
+-						    BINDERFS_MAX_MINOR_CAPPED,
++				      use_reserve ? BINDERFS_MAX_MINOR - 1 :
++						    BINDERFS_MAX_MINOR_CAPPED - 1,
+ 				      GFP_KERNEL);
+ 	else
+ 		minor = -ENOSPC;
+@@ -408,8 +408,8 @@ static int binderfs_binder_ctl_create(struct super_block *sb)
+ 	/* Reserve a new minor number for the new device. */
+ 	mutex_lock(&binderfs_minors_mutex);
+ 	minor = ida_alloc_max(&binderfs_minors,
+-			      use_reserve ? BINDERFS_MAX_MINOR :
+-					    BINDERFS_MAX_MINOR_CAPPED,
++			      use_reserve ? BINDERFS_MAX_MINOR - 1 :
++					    BINDERFS_MAX_MINOR_CAPPED - 1,
+ 			      GFP_KERNEL);
+ 	mutex_unlock(&binderfs_minors_mutex);
+ 	if (minor < 0) {
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index dcce882f3..85f554044 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -1103,7 +1103,8 @@ static irqreturn_t i2c_imx_master_isr(struct imx_i2c_struct *i2c_imx, unsigned i
+ 
+ 	case IMX_I2C_STATE_READ_BLOCK_DATA_LEN:
+ 		i2c_imx_isr_read_block_data_len(i2c_imx);
+-		i2c_imx->state = IMX_I2C_STATE_READ_CONTINUE;
++		if (i2c_imx->state == IMX_I2C_STATE_READ_BLOCK_DATA_LEN)
++			i2c_imx->state = IMX_I2C_STATE_READ_CONTINUE;
+ 		break;
+ 
+ 	case IMX_I2C_STATE_WRITE:
+diff --git a/drivers/regulator/spacemit-p1.c b/drivers/regulator/spacemit-p1.c
+index 2bf9137e1..2b585ba01 100644
+--- a/drivers/regulator/spacemit-p1.c
++++ b/drivers/regulator/spacemit-p1.c
+@@ -87,13 +87,13 @@ static const struct linear_range p1_ldo_ranges[] = {
+ 	}
+ 
+ #define P1_BUCK_DESC(_n) \
+-	P1_REG_DESC(BUCK, buck, _n, "vin", 0x47, BUCK_MASK, 254, p1_buck_ranges)
++	P1_REG_DESC(BUCK, buck, _n, "vin", 0x47, BUCK_MASK, 255, p1_buck_ranges)
+ 
+ #define P1_ALDO_DESC(_n) \
+-	P1_REG_DESC(ALDO, aldo, _n, "vin", 0x5b, LDO_MASK, 117, p1_ldo_ranges)
++	P1_REG_DESC(ALDO, aldo, _n, "vin", 0x5b, LDO_MASK, 128, p1_ldo_ranges)
+ 
+ #define P1_DLDO_DESC(_n) \
+-	P1_REG_DESC(DLDO, dldo, _n, "buck5", 0x67, LDO_MASK, 117, p1_ldo_ranges)
++	P1_REG_DESC(DLDO, dldo, _n, "buck5", 0x67, LDO_MASK, 128, p1_ldo_ranges)
+ 
+ static const struct regulator_desc p1_regulator_desc[] = {
+ 	P1_BUCK_DESC(1),
+diff --git a/drivers/spi/spi-tegra114.c b/drivers/spi/spi-tegra114.c
+index 795a8482c..48fb11fea 100644
+--- a/drivers/spi/spi-tegra114.c
++++ b/drivers/spi/spi-tegra114.c
+@@ -978,11 +978,14 @@ static int tegra_spi_setup(struct spi_device *spi)
+ 	if (spi_get_csgpiod(spi, 0))
+ 		gpiod_set_value(spi_get_csgpiod(spi, 0), 0);
+ 
++	/* Update default register to include CS polarity and SPI mode */
+ 	val = tspi->def_command1_reg;
+ 	if (spi->mode & SPI_CS_HIGH)
+ 		val &= ~SPI_CS_POL_INACTIVE(spi_get_chipselect(spi, 0));
+ 	else
+ 		val |= SPI_CS_POL_INACTIVE(spi_get_chipselect(spi, 0));
++	val &= ~SPI_CONTROL_MODE_MASK;
++	val |= SPI_MODE_SEL(spi->mode & 0x3);
+ 	tspi->def_command1_reg = val;
+ 	tegra_spi_writel(tspi, tspi->def_command1_reg, SPI_COMMAND1);
+ 	spin_unlock_irqrestore(&tspi->lock, flags);
+diff --git a/drivers/spi/spi-tegra20-slink.c b/drivers/spi/spi-tegra20-slink.c
+index fe452d03c..709669610 100644
+--- a/drivers/spi/spi-tegra20-slink.c
++++ b/drivers/spi/spi-tegra20-slink.c
+@@ -1086,8 +1086,10 @@ static int tegra_slink_probe(struct platform_device *pdev)
+ 	reset_control_deassert(tspi->rst);
+ 
+ 	spi_irq = platform_get_irq(pdev, 0);
+-	if (spi_irq < 0)
+-		return spi_irq;
++	if (spi_irq < 0) {
++		ret = spi_irq;
++		goto exit_pm_put;
++	}
+ 	tspi->irq = spi_irq;
+ 	ret = request_threaded_irq(tspi->irq, tegra_slink_isr,
+ 				   tegra_slink_isr_thread, IRQF_ONESHOT,
+diff --git a/drivers/spi/spi-tegra210-quad.c b/drivers/spi/spi-tegra210-quad.c
+index cdc3cb7c0..f425d62e0 100644
+--- a/drivers/spi/spi-tegra210-quad.c
++++ b/drivers/spi/spi-tegra210-quad.c
+@@ -839,6 +839,7 @@ static u32 tegra_qspi_setup_transfer_one(struct spi_device *spi, struct spi_tran
+ 	u32 command1, command2, speed = t->speed_hz;
+ 	u8 bits_per_word = t->bits_per_word;
+ 	u32 tx_tap = 0, rx_tap = 0;
++	unsigned long flags;
+ 	int req_mode;
+ 
+ 	if (!has_acpi_companion(tqspi->dev) && speed != tqspi->cur_speed) {
+@@ -846,10 +847,12 @@ static u32 tegra_qspi_setup_transfer_one(struct spi_device *spi, struct spi_tran
+ 		tqspi->cur_speed = speed;
+ 	}
+ 
++	spin_lock_irqsave(&tqspi->lock, flags);
+ 	tqspi->cur_pos = 0;
+ 	tqspi->cur_rx_pos = 0;
+ 	tqspi->cur_tx_pos = 0;
+ 	tqspi->curr_xfer = t;
++	spin_unlock_irqrestore(&tqspi->lock, flags);
+ 
+ 	if (is_first_of_msg) {
+ 		tegra_qspi_mask_clear_irq(tqspi);
+@@ -1158,6 +1161,7 @@ static int tegra_qspi_combined_seq_xfer(struct tegra_qspi *tqspi,
+ 	u32 address_value = 0;
+ 	u32 cmd_config = 0, addr_config = 0;
+ 	u8 cmd_value = 0, val = 0;
++	unsigned long flags;
+ 
+ 	/* Enable Combined sequence mode */
+ 	val = tegra_qspi_readl(tqspi, QSPI_GLOBAL_CONFIG);
+@@ -1261,13 +1265,17 @@ static int tegra_qspi_combined_seq_xfer(struct tegra_qspi *tqspi,
+ 			tegra_qspi_transfer_end(spi);
+ 			spi_transfer_delay_exec(xfer);
+ 		}
++		spin_lock_irqsave(&tqspi->lock, flags);
+ 		tqspi->curr_xfer = NULL;
++		spin_unlock_irqrestore(&tqspi->lock, flags);
+ 		transfer_phase++;
+ 	}
+ 	ret = 0;
+ 
+ exit:
++	spin_lock_irqsave(&tqspi->lock, flags);
+ 	tqspi->curr_xfer = NULL;
++	spin_unlock_irqrestore(&tqspi->lock, flags);
+ 	msg->status = ret;
+ 
+ 	return ret;
+@@ -1280,6 +1288,7 @@ static int tegra_qspi_non_combined_seq_xfer(struct tegra_qspi *tqspi,
+ 	struct spi_transfer *transfer;
+ 	bool is_first_msg = true;
+ 	int ret = 0, val = 0;
++	unsigned long flags;
+ 
+ 	msg->status = 0;
+ 	msg->actual_length = 0;
+@@ -1360,7 +1369,9 @@ static int tegra_qspi_non_combined_seq_xfer(struct tegra_qspi *tqspi,
+ 		msg->actual_length += xfer->len + dummy_bytes;
+ 
+ complete_xfer:
++		spin_lock_irqsave(&tqspi->lock, flags);
+ 		tqspi->curr_xfer = NULL;
++		spin_unlock_irqrestore(&tqspi->lock, flags);
+ 
+ 		if (ret < 0) {
+ 			tegra_qspi_transfer_end(spi);
+@@ -1440,10 +1451,16 @@ static int tegra_qspi_transfer_one_message(struct spi_controller *host,
+ 
+ static irqreturn_t handle_cpu_based_xfer(struct tegra_qspi *tqspi)
+ {
+-	struct spi_transfer *t = tqspi->curr_xfer;
++	struct spi_transfer *t;
+ 	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&tqspi->lock, flags);
++	t = tqspi->curr_xfer;
++
++	if (!t) {
++		spin_unlock_irqrestore(&tqspi->lock, flags);
++		return IRQ_HANDLED;
++	}
+ 
+ 	if (tqspi->tx_status ||  tqspi->rx_status) {
+ 		tegra_qspi_handle_error(tqspi);
+@@ -1474,7 +1491,7 @@ static irqreturn_t handle_cpu_based_xfer(struct tegra_qspi *tqspi)
+ 
+ static irqreturn_t handle_dma_based_xfer(struct tegra_qspi *tqspi)
+ {
+-	struct spi_transfer *t = tqspi->curr_xfer;
++	struct spi_transfer *t;
+ 	unsigned int total_fifo_words;
+ 	unsigned long flags;
+ 	long wait_status;
+@@ -1513,6 +1530,12 @@ static irqreturn_t handle_dma_based_xfer(struct tegra_qspi *tqspi)
+ 	}
+ 
+ 	spin_lock_irqsave(&tqspi->lock, flags);
++	t = tqspi->curr_xfer;
++
++	if (!t) {
++		spin_unlock_irqrestore(&tqspi->lock, flags);
++		return IRQ_HANDLED;
++	}
+ 
+ 	if (num_errors) {
+ 		tegra_qspi_dma_unmap_xfer(tqspi, t);
+@@ -1552,15 +1575,33 @@ static irqreturn_t handle_dma_based_xfer(struct tegra_qspi *tqspi)
+ static irqreturn_t tegra_qspi_isr_thread(int irq, void *context_data)
+ {
+ 	struct tegra_qspi *tqspi = context_data;
++	unsigned long flags;
++	u32 status;
++
++	/*
++	 * Read transfer status to check if interrupt was triggered by transfer
++	 * completion
++	 */
++	status = tegra_qspi_readl(tqspi, QSPI_TRANS_STATUS);
+ 
+ 	/*
+ 	 * Occasionally the IRQ thread takes a long time to wake up (usually
+ 	 * when the CPU that it's running on is excessively busy) and we have
+ 	 * already reached the timeout before and cleaned up the timed out
+ 	 * transfer. Avoid any processing in that case and bail out early.
++	 *
++	 * If no transfer is in progress, check if this was a real interrupt
++	 * that the timeout handler already processed, or a spurious one.
+ 	 */
+-	if (!tqspi->curr_xfer)
+-		return IRQ_NONE;
++	spin_lock_irqsave(&tqspi->lock, flags);
++	if (!tqspi->curr_xfer) {
++		spin_unlock_irqrestore(&tqspi->lock, flags);
++		/* Spurious interrupt - transfer not ready */
++		if (!(status & QSPI_RDY))
++			return IRQ_NONE;
++		/* Real interrupt, already handled by timeout path */
++		return IRQ_HANDLED;
++	}
+ 
+ 	tqspi->status_reg = tegra_qspi_readl(tqspi, QSPI_FIFO_STATUS);
+ 
+@@ -1571,7 +1612,14 @@ static irqreturn_t tegra_qspi_isr_thread(int irq, void *context_data)
+ 		tqspi->rx_status = tqspi->status_reg & (QSPI_RX_FIFO_OVF | QSPI_RX_FIFO_UNF);
+ 
+ 	tegra_qspi_mask_clear_irq(tqspi);
++	spin_unlock_irqrestore(&tqspi->lock, flags);
+ 
++	/*
++	 * Lock is released here but handlers safely re-check curr_xfer under
++	 * lock before dereferencing.
++	 * DMA handler also needs to sleep in wait_for_completion_*(), which
++	 * cannot be done while holding spinlock.
++	 */
+ 	if (!tqspi->is_curr_dma_xfer)
+ 		return handle_cpu_based_xfer(tqspi);
+ 

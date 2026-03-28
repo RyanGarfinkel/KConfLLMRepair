@@ -1,0 +1,8 @@
+agent-repair-attempts/
+__pycache__/
+workspace/
+venv/
+*.log
+*.raw
+*.img
+.env

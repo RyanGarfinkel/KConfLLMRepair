@@ -1,24 +1,30 @@
-from src.tools import klocalizer, qemu, randconfig
+from src.models import BuildResult, BootResult, KlocalizerResult
+from src.tools import klocalizer, qemu
+from src.kernel import randconfig
 from src.config import settings
 from src.kernel import builder
-from typing import Literal
 from src.utils import log
 from git import Repo
 import shutil
+import time
 import os
 
 class Kernel:
 
     def __init__(self, src: str):
-        
+
         if not os.path.exists(src):
             raise ValueError(f'Kernel source path does not exist: {src}')
-        
+
         self.src = src
+        self.__version: str | None = None
 
     @property
     def version(self) -> str:
-    
+
+        if self.__version:
+            return self.__version
+
         version = ''
         patchlevel = ''
         sublevel = ''
@@ -35,7 +41,8 @@ class Kernel:
                 elif line.startswith('EXTRAVERSION'):
                     extraversion = line.split('=')[1].strip()
 
-        return f'{version}.{patchlevel}.{sublevel}{extraversion}'
+        self.__version = f'{version}.{patchlevel}.{sublevel}{extraversion}'
+        return self.__version
 
     def load_config(self, path: str) -> bool:
 
@@ -55,14 +62,17 @@ class Kernel:
 
     def make_patch(self, path: str) -> bool:
 
-        repo = Repo(self.src)
+        try:
+            repo = Repo(self.src)
+            diff = repo.git.diff(f'HEAD~{settings.runtime.COMMIT_WINDOW}..HEAD')
 
-        diff = repo.git.diff(f'HEAD~{settings.runtime.COMMIT_WINDOW}..HEAD')
-        
-        with open(path, 'w') as f:
-            f.write(diff)
+            with open(path, 'w') as f:
+                f.write(diff)
 
-        return True
+            return True
+        except Exception as e:
+            log.error(f'Failed to create patch: {e}')
+            return False
     
     def make_rand_config(self, path: str, seed: int) -> bool:
 
@@ -76,15 +86,19 @@ class Kernel:
 
         return True
     
-    def run_klocalizer(self, log_path: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
+    def run_klocalizer(self, dir: str, config: str, define: list[str] = [], undefine: list[str] = [], patch: str | None = None) -> KlocalizerResult:
+
+        log_path = f'{dir}/klocalizer.log'
+
+        if not self.load_config(config):
+            return KlocalizerResult(status='error', log=log_path)
 
         log.info('Running KLocalizer...')
-        
-        if not os.path.exists(f'{self.src}/.config'):
-            log.error('No .config file found in kernel source. Please load a configuration before running KLocalizer.')
-            return 'error'
 
-        status = klocalizer.run(self.src, log_path, define, undefine)
+        if patch is not None:
+            status = klocalizer.run_patch(self.src, patch, log_path, define, undefine)
+        else:
+            status = klocalizer.run(self.src, log_path, define, undefine)
 
         if status == 'success':
             log.success('KLocalizer completed successfully.')
@@ -93,40 +107,46 @@ class Kernel:
         else:
             log.error('KLocalizer failed.')
 
-        return status
-    
-    def build(self, path: str) -> bool:
-        
+        return KlocalizerResult(status=status, log=log_path)
+
+    def build(self, dir: str, config: str) -> BuildResult:
+
+        log_path = f'{dir}/build.log'
+
+        if not self.load_config(config):
+            return BuildResult(ok=False, log=log_path)
+
         log.info('Building kernel...')
 
-        if not os.path.exists(f'{self.src}/.config'):
-            log.error('Config file not found in kernel source. Please load a configuration before building.')
-            return False
+        start = time.time()
+        ok = builder.build(self.src, log_path)
+        build_time = time.time() - start
 
-        if not builder.build(self.src, path):
+        if not ok:
             log.error('Build failed. Check log for details.')
-            return False
-        
+            return BuildResult(ok=False, log=log_path, build_time=build_time)
+
         log.success('Build completed successfully.')
 
-        return True
-    
-    def boot(self, path: str) -> Literal['yes', 'maintenance', 'no']:
+        return BuildResult(ok=True, log=log_path, build_time=build_time)
+
+    def boot(self, dir: str) -> BootResult:
 
         log.info('Running QEMU test on kernel...')
 
+        log_path = f'{dir}/boot.log'
+
         if not os.path.exists(f'{self.src}/{settings.kernel.BZIMAGE}'):
             log.error('Kernel binary not found. Please build the kernel before booting.')
-            return 'no'
-        
-        result = qemu.test(self.src, path)
-        if result == 'no':
+            return BootResult(status='no', log=log_path)
+
+        status = qemu.test(self.src, log_path)
+
+        if status == 'no':
             log.error('QEMU test failed. Check log for details.')
-            return 'no'
-        elif result == 'maintenance':
+        elif status == 'maintenance':
             log.info('QEMU test returned maintenance mode.')
-            return 'maintenance'
+        else:
+            log.success('QEMU test completed successfully.')
 
-        log.success('QEMU test completed successfully.')
-
-        return 'yes'
+        return BootResult(status=status, log=log_path)

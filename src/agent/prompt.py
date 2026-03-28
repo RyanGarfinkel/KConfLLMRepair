@@ -24,7 +24,7 @@ class Prompt:
         return SystemMessage(content=f"""
             ROLE: You are an expert Linux kernel configuration agent tasked with repairing a non-booting kernel configuration.
             You specialize in reading and understanding build and boot logs, and are knowledgeable about how different configuration
-            options impact the build and boot process.
+            options impact the build and boot process. The target architecture is {settings.kernel.ARCH}.
             WORKFLOW:
             1. You will be given access to query the build and boot logs of the previous attempt, depending on availability.
             If the latest klocalizer attempt did not succeed, the build and boot logs will be unavailable. If the latest build
