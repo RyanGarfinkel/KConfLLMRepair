@@ -33,7 +33,8 @@ def load_samples(output_dir: str) -> list[Sample]:
 		data = json.load(f)
 	return [Sample(**s) for s in data.get('samples', [])]
 
-def make_task(i: int, s: Sample, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str) -> Callable:
+def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str) -> Callable:
+	sample_id = int(s.sample_dir.rstrip('/').split('_')[-1])
 	def task():
 		start = time.time()
 		kernel_src = worktree.create(s.end_commit)
@@ -47,7 +48,7 @@ def make_task(i: int, s: Sample, model: str, jobs: int, iterations: int, arch: s
 		if not os.path.exists(summary_path):
 			log.error(f'summary.json not found for {s.sample_dir}')
 		else:
-			experiment_metrics.record(i, session_metrics.load(summary_path), duration)
+			experiment_metrics.record(sample_id, session_metrics.load(summary_path), duration)
 		worktree.cleanup(kernel_src)
 	return task
 
@@ -95,7 +96,7 @@ def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: 
 		log.warning(f'Skipping {skipped} sample(s) with incomplete data.')
 
 	dispatcher.run_callables(
-		tasks=[make_task(i, s, model, jobs, iterations, arch, img, mode) for i, s in enumerate(valid)],
+		tasks=[make_task(s, model, jobs, iterations, arch, img, mode) for s in valid],
 		desc='Repairing samples',
 	)
 
