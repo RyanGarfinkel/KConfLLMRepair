@@ -7,12 +7,14 @@ import json
 
 class Session:
     
-    def __init__(self, config: str, output: str, patch: str | None = None):
+    def __init__(self, config: str, output: str, patch: str | None = None, hard_define: set[str] = set(), hard_undefine: set[str] = set()):
 
         self.base = config
         self.attempts: list[Attempt] = []
         self.dir = output
         self.patch = patch
+        self.hard_define = hard_define
+        self.hard_undefine = hard_undefine
 
     @property
     def latest(self) -> str | None:

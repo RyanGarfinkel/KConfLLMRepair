@@ -18,7 +18,7 @@ class Sampler:
 
 	# Random
 
-	def random(self, n: int, complete_callback: Callable[[int, Sample], None] | None = None) -> tuple[dict, list[Sample]]:
+	def random(self, n: int, hard_define: set[str] = set(), hard_undefine: set[str] = set(), complete_callback: Callable[[int, Sample], None] | None = None) -> tuple[dict, list[Sample]]:
 
 		summary, samples = self.__sample_random_configs(n)
 		self.__save(summary, [])
@@ -64,6 +64,13 @@ class Sampler:
 						return
 
 					sample.original_config = f'{sample.sample_dir}/.config'
+
+					if hard_define or hard_undefine:
+						result = kernel.run_klocalizer(sample.sample_dir, sample.original_config, define=list(hard_define), undefine=list(hard_undefine))
+						if result.status != 'success':
+							log.warning(f'KLocalizer failed to apply constraints for sample {i + 1}. Proceeding with unconstrained config.')
+						else:
+							shutil.copyfile(f'{kernel.src}/.config', sample.original_config)
 
 					build_result = kernel.build(sample.sample_dir, sample.original_config)
 					sample.built = build_result.ok
@@ -130,7 +137,7 @@ class Sampler:
 
 	# Patch
 
-	def patch(self, n: int, since: str, complete_callback: Callable[[int, Sample], None] | None = None) -> tuple[dict, list[Sample]]:
+	def patch(self, n: int, since: str, hard_define: set[str] = set(), hard_undefine: set[str] = set(), complete_callback: Callable[[int, Sample], None] | None = None) -> tuple[dict, list[Sample]]:
 
 		summary, samples = self.__sample_patch_commits(n, since)
 		self.__save(summary, [])
@@ -153,7 +160,7 @@ class Sampler:
 
 				os.makedirs(sample.sample_dir, exist_ok=True)
 
-				if not self.__make_patch_sample(sample, kernel):
+				if not self.__make_patch_sample(sample, kernel, hard_define, hard_undefine):
 					log.error(f'Failed to create patch sample {i + 1}.')
 					return
 
@@ -217,7 +224,7 @@ class Sampler:
 
 		return summary, samples
 
-	def __make_patch_sample(self, sample: Sample, kernel: Kernel) -> bool:
+	def __make_patch_sample(self, sample: Sample, kernel: Kernel, hard_define: set[str] = set(), hard_undefine: set[str] = set()) -> bool:
 
 		# Base Config
 
@@ -248,7 +255,7 @@ class Sampler:
 
 		sample.patch = patch_path
 		
-		if kernel.run_klocalizer(sample.sample_dir, original_config, patch=patch_path).status != 'success':
+		if kernel.run_klocalizer(sample.sample_dir, original_config, define=list(hard_define), undefine=list(hard_undefine), patch=patch_path).status != 'success':
 			log.error('KLocalizer failed for patch sample.')
 			return False
 		
