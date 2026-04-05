@@ -5,6 +5,7 @@ from src.agent import model
 from src.utils import log
 import click
 import json
+import time
 import re
 import os
 
@@ -65,6 +66,7 @@ def naive_repair(config: str, build_log: str, boot_log: str, output_dir: str) ->
 		'output_tokens': usage.get('output_tokens', 0),
 		'total_tokens': usage.get('total_tokens', 0),
 	}
+	log.info(f'LLM call complete — {token_usage["input_tokens"]} in / {token_usage["output_tokens"]} out tokens')
 	with open(f'{output_dir}/token_usage.json', 'w') as f:
 		json.dump(token_usage, f, indent=2)
 
@@ -78,7 +80,8 @@ def naive_repair(config: str, build_log: str, boot_log: str, output_dir: str) ->
 
 		json.dump(response, f, indent=4, default=default)
 
-	repaired_config = _extract_config(response.content)
+	content = response.content if isinstance(response.content, str) else ''.join(p.get('text', '') if isinstance(p, dict) else str(p) for p in response.content)
+	repaired_config = _extract_config(content)
 	repaired_path = f'{output_dir}/modified.config'
 	with open(repaired_path, 'w') as f:
 		f.write(repaired_config)
@@ -87,11 +90,12 @@ def naive_repair(config: str, build_log: str, boot_log: str, output_dir: str) ->
 
 	return repaired_path
 
-def _verify(kernel: Kernel, config: str, output_dir: str):
+def _verify(kernel: Kernel, config: str, output_dir: str) -> float:
 	build_result = kernel.build(output_dir, config)
+	log.info(f'Build time: {build_result.build_time:.1f}s')
 	if not build_result.ok:
 		log.error('Repaired config failed to build.')
-		return
+		return build_result.build_time
 
 	boot_result = kernel.boot(output_dir)
 	if boot_result.status == 'yes':
@@ -100,6 +104,8 @@ def _verify(kernel: Kernel, config: str, output_dir: str):
 		log.info('Repaired config boots into maintenance mode.')
 	else:
 		log.error('Repaired config failed to boot.')
+
+	return build_result.build_time
 
 @click.command()
 @click.option('--config', required=True, help='Path to the broken .config file.')
@@ -134,8 +140,11 @@ def main(config: str, build_log: str, boot_log: str, output: str, src: str | Non
 	kernel = Kernel(src)
 	output_dir = f'{os.path.abspath(output)}/llm-repair'
 
+	start = time.time()
 	repaired_path = naive_repair(config, build_log, boot_log, output_dir)
-	_verify(kernel, repaired_path, output_dir)
+	build_time = _verify(kernel, repaired_path, output_dir)
+	total_time = time.time() - start
+	log.info(f'Total time: {total_time:.1f}s | Build time: {build_time:.1f}s')
 
 if __name__ == '__main__':
 	main()
