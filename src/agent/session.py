@@ -35,9 +35,9 @@ class Session:
         
         if self.attempts[-1].boot_succeeded == 'yes':
             return 'success'
-        elif any_maintenance and attempts >= settings.agent.MAX_ITERATIONS:
+        if any_maintenance and attempts >= settings.agent.MAX_ITERATIONS:
             return 'success-maintenance'
-        elif attempts >= settings.agent.MAX_ITERATIONS:
+        if attempts >= settings.agent.MAX_ITERATIONS:
             return 'max-attempts-reached'
         
         return 'in-progress'
@@ -85,7 +85,7 @@ class Session:
         return diffconfig.compare(self.base, self.latest)
     
     def save(self, path: str):
-        with open(path, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(self.__dict__(), f, indent=4)
     
     def __dict__(self) -> dict:

@@ -14,7 +14,7 @@ class KLocalizer:
 
         parent = os.path.dirname(log)
 
-        with open(f'{parent}/constraints.txt', 'w') as f:
+        with open(f'{parent}/constraints.txt', 'w', encoding='utf-8') as f:
             for option in define:
                 f.write(f'{option}\n')
 
@@ -23,7 +23,7 @@ class KLocalizer:
 
         cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, f'{parent}/constraints.txt', log, settings.kernel.ARCH]
 
-        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
         if result.returncode == 0:
             return 'success'
@@ -41,7 +41,7 @@ class KLocalizer:
         for opt in undefine:
             cmd.extend(['--undefine', opt])
 
-        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
         if result.returncode == 0:
             return 'success'

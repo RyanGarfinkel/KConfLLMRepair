@@ -8,7 +8,7 @@ class Builder:
     def build(self, kernel_src: str, log_file: str) -> bool:
 
         cmd = ['bash', settings.scripts.BUILD_SCRIPT, kernel_src, log_file, settings.kernel.ARCH, settings.kernel.BZIMAGE, str(settings.runtime.JOBS)]
-        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
         return result.returncode == 0
     

@@ -21,7 +21,7 @@ class AgentTools:
             compiled = re.compile(re.escape(pattern), re.IGNORECASE)
 
         results = []
-        with open(path, 'r', errors='replace') as f:
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
             for i, line in enumerate(f, 1):
                 if compiled.search(line):
                     results.append(f'{i + 1}: {line.strip()}')
@@ -34,7 +34,7 @@ class AgentTools:
                 return [f'{path} does not exist.']
 
         results = []
-        with open(path, 'r', errors='replace') as f:
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
             lines = f.readlines()
             start = max(0, line - 25)
             end = min(len(lines), line + 25)
@@ -49,7 +49,7 @@ class AgentTools:
                 return [f'{path} does not exist.']
 
         map = {}
-        with open(path, 'r', errors='replace') as f:
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
             for line in f:
                 line = line.strip()
 
