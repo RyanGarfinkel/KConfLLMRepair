@@ -9,13 +9,12 @@ class Qemu:
     def test(self, kernel_src: str, log_file: str) -> Literal['yes', 'maintenance', 'no']:
 
         cmd = ['bash', settings.scripts.QEMU_TEST_SCRIPT, kernel_src, f'{kernel_src}/{settings.kernel.BZIMAGE}', log_file, settings.kernel.ARCH, settings.kernel.DEBIAN_IMG]
-        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
 
         if result.returncode == 0:
             return 'yes'
-        elif result.returncode == 2:
+        if result.returncode == 2:
             return 'maintenance'
-        else:
-            return 'no'
+        return 'no'
 
 qemu = Qemu()

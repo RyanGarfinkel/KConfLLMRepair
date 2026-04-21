@@ -1,3 +1,5 @@
+# pylint: disable=import-outside-toplevel
+
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from singleton_decorator import singleton
 from typing import Callable

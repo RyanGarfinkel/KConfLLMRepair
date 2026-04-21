@@ -4,12 +4,12 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - Dockerfile
+      - docker/Dockerfile
       - requirements.txt
   push:
     branches: [main]
     paths:
-      - Dockerfile
+      - docker/Dockerfile
       - requirements.txt
   workflow_dispatch:
 
@@ -34,6 +34,7 @@ jobs:
       - uses: docker/build-push-action@v5
         with:
           context: .
+          file: docker/Dockerfile
           push: true
           tags: ghcr.io/ryangarfinkel/kconfllmrepair:latest
           cache-from: type=gha

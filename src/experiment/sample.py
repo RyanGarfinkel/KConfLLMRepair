@@ -1,3 +1,5 @@
+# pylint: disable=too-many-statements
+
 from src.utils import log, dispatcher, file_lock, seed_lock
 from singleton_decorator import singleton
 from src.kernel import worktree
@@ -266,7 +268,7 @@ class Sampler:
 		return True
 
 	def read_samples(self, n: int) -> list[Sample]:
-		with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'r') as f:
+		with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'r', encoding='utf-8') as f:
 			data = json.load(f)
 		return [Sample(**s) for s in data.get('samples', [])][:n]
 
@@ -274,7 +276,7 @@ class Sampler:
 
 		with file_lock:
 			os.makedirs(settings.runtime.OUTPUT_DIR, exist_ok=True)
-			with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'w') as f:
+			with open(f'{settings.runtime.OUTPUT_DIR}/sampling.json', 'w', encoding='utf-8') as f:
 				json.dump({
 					'summary': {
 						**summary,

@@ -1,3 +1,5 @@
+# pylint: disable=invalid-name
+
 from pydantic import field_validator, model_validator, ValidationInfo, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
@@ -57,19 +59,21 @@ class AgentSettings(BaseModel):
     def PROVIDER(self) -> str:
         if self.MODEL.startswith('gemini'):
             return 'google'
-        elif self.MODEL.startswith('gpt'):
-            return 'openai'
-        else:
-            raise ValueError(f'Unknown model provider for model: {self.MODEL}')
         
+        if self.MODEL.startswith('gpt'):
+            return 'openai'
+        
+        raise ValueError(f'Unknown model provider for model: {self.MODEL}')
+
     @property
     def EMBEDDING_MODEL(self) -> str:
         if self.PROVIDER == 'google':
             return 'gemini-embedding-001'
-        elif self.PROVIDER == 'openai':
+        
+        if self.PROVIDER == 'openai':
             return 'text-embedding-3-small'
-        else:
-            raise ValueError(f'Unknown embedding model for provider: {self.PROVIDER}')
+        
+        raise ValueError(f'Unknown embedding model for provider: {self.PROVIDER}')
 
     MAX_ITERATIONS: int = Field(default=20, ge=1)
     MAX_TOOL_CALLS: int = Field(default=20, ge=1)
@@ -151,7 +155,7 @@ settings = None
 try:
     settings = Settings()
 except Exception as e:
-    raise RuntimeError(f'Failed to load configuration: {e}')
+    raise RuntimeError(f'Failed to load configuration: {e}') from e
 
 def log_settings():
     print(f'[INFO] Using {settings.agent.MODEL}')
