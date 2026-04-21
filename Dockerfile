@@ -56,6 +56,7 @@ ENV PATH=$VIRTUAL_ENV/bin:/usr/lib/ccache:$PATH
 COPY requirements.txt /tmp/requirements.txt
 RUN python3 -m venv $VIRTUAL_ENV \
     && pip install --upgrade pip "setuptools<80" wheel cython \
+    && pip install pylint \
     && pip install -r /tmp/requirements.txt \
     && pip install --no-build-isolation dd==0.5.7 \
     && git clone --branch dev/klocalizer-add-check-mutex --depth 1 https://github.com/paulgazz/kmax.git /tmp/kmax \
