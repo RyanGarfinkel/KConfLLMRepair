@@ -103,9 +103,9 @@ class Agent:
         session.attempts.append(attempt)
 
         tools = agent_tools.get(session)
-        agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
+        llm_agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
 
-        response = agent.invoke({ 'messages': prompt.prompt(session) })
+        response = llm_agent.invoke({ 'messages': prompt.prompt(session) })
 
         attempt.token_usage = LLMUsage.from_response(response)
         self.__save_raw_response(f'{dir}/raw-agent-response.json', response)
