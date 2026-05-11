@@ -18,6 +18,10 @@ class AgentResponse(BaseModel):
                 continue
             if not name.startswith('CONFIG_'):
                 name = f'CONFIG_{name}'
+            if not name.isupper():
+                name = name.upper()
+            if '=' in name:
+                name = name.split('=')[0].strip()
             result.append(name)
         
         return result

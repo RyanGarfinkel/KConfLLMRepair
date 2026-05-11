@@ -16,7 +16,7 @@ import os
 class Agent:
 
     def __init__(self):
-        self.middleware = [ToolCallLimitMiddleware(run_limit=settings.agent.MAX_TOOL_CALLS)]
+        self.middleware = [ToolCallLimitMiddleware(run_limit=settings.agent.MAX_TOOL_CALLS, exit_behavior='end')]
 
     def repair(self, input: Input, kernel: Kernel) -> Session:
 
@@ -102,15 +102,10 @@ class Agent:
         attempt = Attempt(id=len(session.attempts), dir=dir)
         session.attempts.append(attempt)
 
-        tools = agent_tools.get(session)
-        agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
+        agent_response, token_usage, raw_response = self.__generate_response(llm, session)
 
-        response = agent.invoke({ 'messages': prompt.prompt(session) })
-
-        attempt.token_usage = LLMUsage.from_response(response)
-        self.__save_raw_response(f'{dir}/raw-agent-response.json', response)
-
-        agent_response = response.get('structured_response', None)
+        attempt.token_usage = token_usage
+        self.__save_raw_response(f'{dir}/raw-agent-response.json', raw_response)
 
         if agent_response is None:
             log.error('Agent failed to provide a structured response. Skipping attempt.')
@@ -141,6 +136,28 @@ class Agent:
         attempt.boot_log = boot.log
         attempt.boot_succeeded = boot.status
         
+    def __generate_response(self, llm: BaseChatModel, session: Session) -> tuple[AgentResponse | None, LLMUsage, dict]:
+
+        tools = agent_tools.get(session)
+        agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
+        
+        response = agent.invoke({ 'messages': prompt.prompt(session) })
+
+        usage = LLMUsage.from_response(response)
+        agent_response = response.get('structured_response', None)
+
+        if agent_response is None:
+            try:
+                result = llm.with_structured_output(AgentResponse, include_raw=True).invoke(response['messages'])
+                if result.get('raw'):
+                    usage = usage + LLMUsage.from_ai_message(result['raw'])
+                    response['messages'].append(result['raw'])
+                agent_response = result.get('parsed')
+            except Exception:
+                pass
+
+        return agent_response, usage, response
+
     def __apply_hard_constraints(self, define: list[str], undefine: list[str], hard_define: set[str], hard_undefine: set[str]) -> tuple[list[str], list[str]]:
         
         define = list((set(define) - hard_undefine) | hard_define)
@@ -151,9 +168,9 @@ class Agent:
     def __save_raw_response(self, path, response: dict):
         with open(path, 'w') as f:
             def default(o):
-                if hasattr(o, "dict"):
+                if hasattr(o, 'dict'):
                     return o.dict()
-                if hasattr(o, "model_dump"):
+                if hasattr(o, 'model_dump'):
                     return o.model_dump()
                 
                 return str(o)

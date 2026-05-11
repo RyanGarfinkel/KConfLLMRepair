@@ -67,7 +67,6 @@ def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img:
 		
 	return task
 
-
 @click.command()
 @click.option('--jobs', '-j', default=8, help='Number of parallel jobs for building kernels.')
 @click.option('--threads', '-t', default=1, help='Number of samples to repair in parallel.')
