@@ -1,7 +1,10 @@
+from unittest.mock import patch, MagicMock
 import pytest
 import os
 
 os.environ['GOOGLE_API_KEY'] = 'fake-key-for-testing'
+
+patch('git.Repo', MagicMock()).start()
 
 FIXTURES_DIR = os.path.join(os.path.dirname(__file__), 'fixtures')
 

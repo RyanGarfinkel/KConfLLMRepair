@@ -63,3 +63,19 @@ jobs:
 
       - name: Run pylint
         run: pylint src/ --fail-under=9.75
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/ryangarfinkel/kconfllmrepair:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run unit tests
+        run: pytest tests/unit/
+        env:
+          GOOGLE_API_KEY: fake-key-for-ci
