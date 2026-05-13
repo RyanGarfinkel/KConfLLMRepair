@@ -6,7 +6,7 @@ import json
 class SessionMetrics:
 
 	def load(self, path: str) -> dict:
-		with open(path) as f:
+		with open(path, encoding='utf-8') as f:
 			data = json.load(f)
 
 		summary = data['summary']
@@ -38,7 +38,7 @@ class ExperimentMetrics:
 		successes = [d for d in entries if d['status'] in ['success', 'success-maintenance']]
 		total_attempts = sum(d['attempts'] for d in entries)
 
-		with open(f'{settings.runtime.OUTPUT_DIR}/results.json', 'w') as f:
+		with open(f'{settings.runtime.OUTPUT_DIR}/results.json', 'w', encoding='utf-8') as f:
 			json.dump({
 				'summary': {
 					'n': n,

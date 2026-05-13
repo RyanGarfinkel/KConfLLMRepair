@@ -2,7 +2,6 @@ from singleton_decorator import singleton
 from src.config import settings
 from src.utils import log
 import subprocess
-import os
 
 @singleton
 class DiffConfig:
@@ -13,7 +12,7 @@ class DiffConfig:
 
         cmd = [diffconfig_path, base_config, modified_config]
 
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
 
         if result.returncode != 0:
             log.error('DiffConfig failed to compare configurations.')

@@ -39,7 +39,7 @@ class Input(BaseModel):
 			return set()
 
 		result = set()
-		with open(self.hard_constraints) as f:
+		with open(self.hard_constraints, encoding='utf-8') as f:
 			for line in f:
 				line = line.strip()
 				if line and not line.startswith('!'):
@@ -54,7 +54,7 @@ class Input(BaseModel):
 			return set()
 
 		result = set()
-		with open(self.hard_constraints) as f:
+		with open(self.hard_constraints, encoding='utf-8') as f:
 			for line in f:
 				line = line.strip()
 				if line and line.startswith('!'):
