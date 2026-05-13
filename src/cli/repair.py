@@ -51,7 +51,7 @@ def main(config: str | None, original: str | None, modified: str | None, patch: 
 
     input = get_input(config=config, original=original, modified=modified, patch=patch, constraints=constraints)
 
-    settings.runtime.OUTPUT_DIR = f'{output}/agent_repair'
+    settings.runtime.OUTPUT_DIR = os.path.abspath(f'{output}/agent_repair')
     settings.runtime.JOBS = jobs
     settings.runtime.USE_RAG = rag
     settings.agent.MODEL = model
@@ -61,7 +61,7 @@ def main(config: str | None, original: str | None, modified: str | None, patch: 
         settings.kernel.ARCH = arch
 
     if img is not None:
-        settings.kernel.DEBIAN_IMG = img
+        settings.kernel.DEBIAN_IMG = os.path.abspath(img)
 
     if src is None:
         src = settings.kernel.KERNEL_SRC

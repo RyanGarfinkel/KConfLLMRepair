@@ -147,7 +147,7 @@ class Kernel:
         if status == 'no':
             log.error('QEMU test failed. Check log for details.')
         elif status == 'maintenance':
-            log.info('QEMU test returned maintenance mode.')
+            log.warning('QEMU test returned maintenance mode.')
         else:
             log.success('QEMU test completed successfully.')
 
