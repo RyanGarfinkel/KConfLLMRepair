@@ -26,18 +26,17 @@ class Session:
     @property
     def status(self) -> str:
 
-        attempts = len(self.attempts)
-
-        if attempts == 0:
+        if len(self.attempts) == 0:
             return 'initialized'
-        
+
+        repair_attempts = len(self.attempts) - 1
         any_maintenance = any(a.boot_succeeded == 'maintenance' for a in self.attempts)
-        
+
         if self.attempts[-1].boot_succeeded == 'yes':
             return 'success'
-        if any_maintenance and attempts >= settings.agent.MAX_ITERATIONS:
+        elif any_maintenance and repair_attempts >= settings.agent.MAX_ITERATIONS:
             return 'success-maintenance'
-        if attempts >= settings.agent.MAX_ITERATIONS:
+        elif repair_attempts >= settings.agent.MAX_ITERATIONS:
             return 'max-attempts-reached'
         
         return 'in-progress'
@@ -51,8 +50,16 @@ class Session:
         )
 
     @property
+    def total_llm_time(self) -> float:
+        return sum(a.llm_time for a in self.attempts)
+
+    @property
     def total_build_time(self) -> float:
         return sum(a.build_time for a in self.attempts)
+
+    @property
+    def total_boot_time(self) -> float:
+        return sum(a.boot_time for a in self.attempts)
 
     @property
     def embedding_usage(self) -> EmbeddingUsage:
@@ -106,7 +113,9 @@ class Session:
                 'repaired_config': repaired_config,
                 'edit_distance': edit_distance,
                 'total_constraints': self.constraints['total'],
+                'total_llm_time': self.total_llm_time,
                 'total_build_time': self.total_build_time,
+                'total_boot_time': self.total_boot_time,
             },
             'models': {
                 'llm': settings.agent.MODEL,

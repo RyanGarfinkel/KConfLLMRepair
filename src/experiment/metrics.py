@@ -11,9 +11,11 @@ class SessionMetrics:
 
 		summary = data['summary']
 		return {
+			'path': path,
 			'status': summary['status'],
 			'attempts': summary['attempts'],
 			'edit_distance': summary['edit_distance'],
+			'llm_time': summary['total_llm_time'],
 			'constraints': data['constraints'],
 			'llm_token_usage': data['llm_token_usage'],
 			'embedding_token_usage': data['embedding_token_usage'],
@@ -49,11 +51,29 @@ class ExperimentMetrics:
 					'avg_success_edit_distance': sum(d['edit_distance'] for d in successes) / len(successes) if successes else -1,
 					'avg_success_constraints': sum(d['constraints']['total'] for d in successes) / len(successes) if successes else -1,
 				},
+				'success_rate': {
+					'5': len([d for d in entries if d['status'] == 'success' and d['attempts'] <= 5]) / n,
+					'10': len([d for d in entries if d['status'] == 'success' and d['attempts'] <= 10]) / n,
+					'15': len([d for d in entries if d['status'] == 'success' and d['attempts'] <= 15]) / n,
+					'20': len([d for d in entries if d['status'] == 'success' and d['attempts'] <= 20]) / n,
+				},
 				'llm_token_usage': {
 					'model': settings.agent.MODEL,
-					'input_tokens': sum(d['llm_token_usage']['input_tokens'] for d in entries),
-					'output_tokens': sum(d['llm_token_usage']['output_tokens'] for d in entries),
-					'total_tokens': sum(d['llm_token_usage']['total_tokens'] for d in entries),
+					'total': {
+						'input_tokens': sum(d['llm_token_usage']['input_tokens'] for d in entries),
+						'output_tokens': sum(d['llm_token_usage']['output_tokens'] for d in entries),
+						'total_tokens': sum(d['llm_token_usage']['total_tokens'] for d in entries),
+					},
+					'avg_per_repair': {
+						'input_tokens': sum(d['llm_token_usage']['input_tokens'] for d in entries) / n,
+						'output_tokens': sum(d['llm_token_usage']['output_tokens'] for d in entries) / n,
+						'total_tokens': sum(d['llm_token_usage']['total_tokens'] for d in entries) / n,
+					},
+					'avg_per_attempt': {
+						'input_tokens': sum(d['llm_token_usage']['input_tokens'] for d in entries) / total_attempts if total_attempts > 0 else -1,
+						'output_tokens': sum(d['llm_token_usage']['output_tokens'] for d in entries) / total_attempts if total_attempts > 0 else -1,
+						'total_tokens': sum(d['llm_token_usage']['total_tokens'] for d in entries) / total_attempts if total_attempts > 0 else -1,
+					}
 				},
 				'embedding_token_usage': {
 					'model': settings.agent.EMBEDDING_MODEL if settings.runtime.USE_RAG else None,
@@ -68,6 +88,7 @@ class ExperimentMetrics:
 				'samples': [
 					{
 						'sample': idx + 1,
+						'path': d['path'],
 						'status': d['status'],
 						'attempts': d['attempts'],
 						'duration': d['duration'],

@@ -67,7 +67,6 @@ def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img:
 		
 	return task
 
-
 @click.command()
 @click.option('--jobs', '-j', default=8, help='Number of parallel jobs for building kernels.')
 @click.option('--threads', '-t', default=1, help='Number of samples to repair in parallel.')
@@ -77,7 +76,8 @@ def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img:
 @click.option('--patch', 'mode', flag_value='patch', help='Use patch-based samples.')
 @click.option('--random', 'mode', flag_value='random', default=True, help='Use random config samples (default).')
 @click.option('--constraints', default=None, help='Path to a hard constraints file (OPTION to define, !OPTION to undefine).')
-def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: str, constraints: str | None):
+@click.option('-n', default=None, type=int, help='Number of samples to repair (default: all).')
+def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: str, constraints: str | None, n: int | None):
 
 	output_dir = f'{settings.runtime.OUTPUT_DIR}/{arch}'
 	settings.runtime.OUTPUT_DIR = output_dir
@@ -111,9 +111,15 @@ def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: 
 	if skipped:
 		log.warning(f'Skipping {skipped} sample(s) with incomplete data.')
 
+	if n is not None:
+		valid = valid[:n]
+
+	labels = [f'sample {int(s.sample_dir.rstrip("/").split("_")[-1])}' for s in valid]
+
 	dispatcher.run_callables(
 		tasks=[make_task(s, model, jobs, iterations, arch, img, mode, constraints) for s in valid],
 		desc='Repairing samples',
+		labels=labels,
 	)
 
 if __name__ == '__main__':

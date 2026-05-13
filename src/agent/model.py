@@ -21,6 +21,7 @@ class Model:
         raise ValueError(f'Unknown model provider for model: {settings.agent.MODEL}')
 
     def get_embedding_model(self) -> BaseEmbedding:
+
         if settings.agent.PROVIDER == 'openai':
             raise NotImplementedError('OpenAI embedding model is not implemented yet.')
         if settings.agent.PROVIDER == 'google':
