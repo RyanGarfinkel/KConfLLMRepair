@@ -9,7 +9,7 @@ class Syzkaller:
     def run(self, kernel_src: str, output: str) -> bool:
 
         cmd = ['bash', settings.scripts.SYZ_KCONF_SCRIPT, kernel_src, output, settings.kernel.SYZKCONF_INSTANCE]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         
         if result.returncode != 0:
             log.error(f'Syzkaller failed with exit code {result.returncode}')
@@ -19,4 +19,3 @@ class Syzkaller:
         return result.returncode == 0
 
 syzkaller = Syzkaller()
-        

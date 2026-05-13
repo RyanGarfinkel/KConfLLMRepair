@@ -170,7 +170,7 @@ class Agent:
         return define, undefine
 
     def __save_raw_response(self, path, response: dict):
-        with open(path, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             def default(o):
                 if hasattr(o, 'dict'):
                     return o.dict()

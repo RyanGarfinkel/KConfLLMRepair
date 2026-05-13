@@ -30,7 +30,7 @@ class Kernel:
         sublevel = ''
         extraversion = ''
 
-        with open(f'{self.src}/Makefile', 'r') as f:
+        with open(f'{self.src}/Makefile', 'r', encoding='utf-8') as f:
             for line in f:
                 if line.startswith('VERSION'):
                     version = line.split('=')[1].strip()
@@ -66,7 +66,7 @@ class Kernel:
             repo = Repo(self.src)
             diff = repo.git.diff(f'HEAD~{settings.runtime.COMMIT_WINDOW}..HEAD')
 
-            with open(path, 'w') as f:
+            with open(path, 'w', encoding='utf-8') as f:
                 f.write(diff)
 
             return True

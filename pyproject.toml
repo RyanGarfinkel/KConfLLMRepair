@@ -1,0 +1,46 @@
+[project]
+name = "kbootrepair"
+version = "0.1.0"
+dependencies = []
+
+[project.scripts]
+kbootrepair = "src.cli.repair:main"
+kbootrepair-sample = "src.cli.sample:main"
+kbootrepair-experiment = "src.cli.experiment:main"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.backends.legacy:build"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[tool.pylint.main]
+ignore-paths = ["venv", "workspace"]
+
+[tool.pylint.format]
+indent-string = "\t"
+max-line-length = 180
+
+[tool.pylint."messages control"]
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-positional-arguments",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "too-many-branches",
+    "logging-fstring-interpolation",
+    "broad-exception-caught",
+    "trailing-whitespace",
+    "bad-indentation",
+    "no-member",
+    "arguments-differ",
+    "wrong-import-order",
+    "ungrouped-imports",
+    "no-self-argument",
+    "not-an-iterable",
+]
