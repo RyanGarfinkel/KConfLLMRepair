@@ -34,9 +34,9 @@ class Session:
 
         if self.attempts[-1].boot_succeeded == 'yes':
             return 'success'
-        elif any_maintenance and repair_attempts >= settings.agent.MAX_ITERATIONS:
+        if any_maintenance and repair_attempts >= settings.agent.MAX_ITERATIONS:
             return 'success-maintenance'
-        elif repair_attempts >= settings.agent.MAX_ITERATIONS:
+        if repair_attempts >= settings.agent.MAX_ITERATIONS:
             return 'max-attempts-reached'
         
         return 'in-progress'

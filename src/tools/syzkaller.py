@@ -19,4 +19,3 @@ class Syzkaller:
         return result.returncode == 0
 
 syzkaller = Syzkaller()
-        

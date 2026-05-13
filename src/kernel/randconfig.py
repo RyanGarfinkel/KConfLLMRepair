@@ -19,4 +19,3 @@ class RandConfig:
         return result.returncode == 0
 
 randconfig = RandConfig()
-        
