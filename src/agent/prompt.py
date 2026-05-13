@@ -7,96 +7,117 @@ from .session import Session
 
 @singleton
 class Prompt:
-    
-    def system(self, session: Session) -> SystemMessage:
 
-        if settings.runtime.USE_RAG:
-            log_instruction = (
-                "Use semantic search queries to retrieve relevant sections of each log. "
-                "Queries should describe what you are looking for in terms of meaning and context, "
-                "not keywords or patterns. Describe the failure mode, compiler behavior, or kernel "
-                "subsystem involved rather than quoting log text directly."
-            )
-        else:
-            log_instruction = "Use grep to search logs by pattern, and chunk to retrieve lines around a specific line number."
+	def system(self, session: Session) -> SystemMessage:
 
-        hard_constraints = ''
-        if session.hard_define or session.hard_undefine:
-            define_line = f'MUST DEFINE: {session.hard_define}\n' if session.hard_define else ''
-            undefine_line = f'MUST UNDEFINE: {session.hard_undefine}\n' if session.hard_undefine else ''
-            hard_constraints = f"""
-            HARD CONSTRAINTS: In every iteration, you must include the following options in your response exactly as specified.
-            Do not suggest anything that contradicts them.
-            {define_line}{undefine_line}"""
+		if settings.runtime.USE_RAG:
+			log_instruction = (
+				'Use semantic search queries describing the failure mode or kernel subsystem '
+				'rather than quoting log text directly.'
+			)
+		else:
+			log_instruction = (
+				'Use grep with targeted patterns like "error:" or "panic". '
+				'Use chunk to get surrounding context around a specific line number.'
+			)
 
-        return SystemMessage(content=f"""
-            ROLE: You are an expert Linux kernel configuration agent tasked with repairing a non-booting kernel configuration.
-            You specialize in reading and understanding build and boot logs, and are knowledgeable about how different configuration
-            options impact the build and boot process. The target architecture is {settings.kernel.ARCH}.
-            {hard_constraints}
-            WORKFLOW:
-            1. You will be given access to query the build and boot logs of the previous attempt, depending on availability.
-            If the latest klocalizer attempt did not succeed, the build and boot logs will be unavailable. If the latest build
-            attempt failed, the boot log will be unavailable. If the latest boot attempt failed, all logs will be available.
-            {log_instruction}
-            2. You will also have access to the original and latest (if not the first attempt) configuration files. Search these
-            to understand the options likely causing the failure. You may query multiple options at once, but be mindful that you
-            have a limit of {settings.agent.MAX_TOOL_CALLS} tool calls per attempt. Reserve at least one call for your final
-            response. If the previous klocalizer attempt did not succeed, the latest configuration file will be unavailable.
-            3. Once you have gathered enough information, respond with what configuration options should be defined and undefined,
-            and your reasoning. KLocalizer will apply these changes to the original configuration each time, so include all options
-            that should be defined or undefined — not just new changes from the previous attempt. If KLocalizer generates a new
-            configuration, it will automatically attempt to build and boot it. If it fails, you will have access to the new logs
-            on the next attempt.
-            IMPORTANT: You must always submit a structured response before your tool call budget is exhausted. If you are running
-            low on tool calls, stop querying and submit your best response immediately with the information you have gathered so far.
-            GOAL: Repair the kernel configuration so that it successfully boots. You will have at most {settings.agent.MAX_ITERATIONS}
-            attempts to do this.
-        """)
-        
-    def user(self, session: Session) -> HumanMessage:
+		hard_constraints = ''
+		if session.hard_define or session.hard_undefine:
+			define_line = f'  MUST DEFINE: {session.hard_define}\n' if session.hard_define else ''
+			undefine_line = f'  MUST UNDEFINE: {session.hard_undefine}\n' if session.hard_undefine else ''
+			hard_constraints = (
+				'\nHARD CONSTRAINTS - you must include these in every response without exception:\n'
+				f'{define_line}{undefine_line}'
+			)
 
-        content = ''
+		return SystemMessage(content=
+			'You are an expert Linux kernel configuration repair agent. '
+			f'Your goal is to fix a non-booting {settings.kernel.ARCH} kernel by identifying which '
+			'Kconfig options are causing build or boot failures and correcting them.'
+			f'{hard_constraints}\n\n'
 
-        if len(session.attempts) == 1:
-            content += """
-                STATUS: Initial Attempt.
-            """
-        else:
-            content += f"""
-                STATUS: Attempt {len(session.attempts) - 1} / {settings.agent.MAX_ITERATIONS}.
-            """
+			'HOW KCONFIG CHANGES ARE APPLIED\n'
+			'You output a define list and an undefine list each iteration. '
+			'KLocalizer applies them to the original config every time, not to the previous modified config. '
+			'Your response must always contain the complete set of changes you want. '
+			'If you defined an option in a previous attempt and omit it now, it will be dropped silently. '
+			'KLocalizer resolves Kconfig dependencies automatically and may define or undefine '
+			'additional options beyond what you specify to satisfy the dependency graph.\n\n'
 
-        content += f"""
-            INSTRUCTIONS:
-            1. Check which tools are available to you. Start by querying the latest log files to gather information about the failure.
-            2. If the latest configuration is available, compare it to the original to see what options have changed.
-            3. You have a budget of {settings.agent.MAX_TOOL_CALLS} tool calls. Once you have gathered enough information — or before
-            you exhaust your budget — submit your structured response with the options to define and undefine and your reasoning.
-        """
+			'WORKFLOW\n'
+			'Follow these steps in order each attempt:\n'
+			'1. Read the attempt history. Identify the current failure stage (klocalizer / build / boot) '
+			'and note what options were already tried and what effect they had.\n'
+			f'2. Build failure: grep for "error:" to find the first compiler or linker error. {log_instruction}\n'
+			'3. Boot failure: grep for "error", "panic", or "failed" to identify the failure point.\n'
+			'4. Look up the implicated options in the original and latest config to see their current state.\n'
+			'5. If the same error persists after defining an option, the root cause is likely a missing '
+			'dependency. Search for related options or grep the config for options referenced in the error.\n'
+			'6. Respond with the complete cumulative define and undefine lists and clear reasoning '
+			'explaining which error each change addresses.\n\n'
 
-        if len(session.attempts) == 1:
-            return HumanMessage(content=content)
-        
-        content += 'HISTORY:'
+			'CONSTRAINTS\n'
+			f'You have {settings.agent.MAX_TOOL_CALLS} tool calls per attempt. '
+			'Use targeted patterns, do not grep broadly. '
+			'If you are running low, stop investigating and submit your best response immediately '
+			'rather than exhausting the budget without responding.\n\n'
 
-        for i, attempt in enumerate(session.attempts):
-            content += self.__format_attempt(i + 1, attempt)
+			'GOAL\n'
+			'Repair the config so the kernel boots successfully. '
+			f'You have at most {settings.agent.MAX_ITERATIONS} attempts.'
+		)
 
-        return HumanMessage(content=content)
+	def user(self, session: Session) -> HumanMessage:
 
-    def __format_attempt(self, i: int, attempt: Attempt) -> str:
-        return f"""
-            ATTEMPT {i} / {settings.agent.MAX_ITERATIONS}:
-            KLOCALIZER: {attempt.klocalizer_status}
-            BUILD: {"Success" if attempt.build_succeeded else "Failed"}
-            BOOT: { attempt.boot_succeeded }
-            OPTIONS INCLUDED: {attempt.response.define if attempt.response else None}
-            OPTIONS EXCLUDED: {attempt.response.undefine if attempt.response else None}
-            REASONING: {attempt.response.reasoning if attempt.response else None}
-        """
-    
-    def prompt(self, session: Session) -> list[BaseMessage]:
-        return [self.system(session), self.user(session)]
-    
+		attempt_num = len(session.attempts) - 1
+		past_attempts = session.attempts[:-1]
+
+		content = (
+			f'ATTEMPT {attempt_num} / {settings.agent.MAX_ITERATIONS}\n\n'
+			'INSTRUCTIONS\n'
+			'1. Review the history below to identify the current failure stage and what has already been tried.\n'
+			'2. Grep for "error:" or "panic" in the relevant log to pinpoint the root cause.\n'
+			'3. Look up the implicated options in the original config (and latest config if available).\n'
+			'4. Respond with the COMPLETE cumulative define and undefine lists (every option you want changed, '
+			f'not just new additions). Constraints: {settings.agent.MAX_TOOL_CALLS} tool calls.\n\n'
+		)
+
+		content += 'HISTORY\n'
+
+		if not past_attempts:
+			content += 'None - this is the first attempt.'
+			return HumanMessage(content=content)
+
+		content += self.__format_initial(past_attempts[0])
+
+		for i, attempt in enumerate(past_attempts[1:], 1):
+			content += self.__format_attempt(i, attempt)
+
+		return HumanMessage(content=content)
+
+	def __format_initial(self, attempt: Attempt) -> str:
+		return (
+			'Initial config test:\n'
+			f'  Build: {"Success" if attempt.build_succeeded else "Failed"}\n'
+			f'  Boot:  {attempt.boot_succeeded}\n'
+		)
+
+	def __format_attempt(self, i: int, attempt: Attempt) -> str:
+		define = attempt.response.define if attempt.response else None
+		undefine = attempt.response.undefine if attempt.response else None
+		reasoning = attempt.response.reasoning if attempt.response else None
+
+		return (
+			f'\nAttempt {i} / {settings.agent.MAX_ITERATIONS}:\n'
+			f'  KLocalizer: {attempt.klocalizer_status}\n'
+			f'  Build:      {"Success" if attempt.build_succeeded else "Failed"}\n'
+			f'  Boot:       {attempt.boot_succeeded}\n'
+			f'  Defined:    {define}\n'
+			f'  Undefined:  {undefine}\n'
+			f'  Reasoning:  {reasoning}\n'
+		)
+
+	def prompt(self, session: Session) -> list[BaseMessage]:
+		return [self.system(session), self.user(session)]
+
 prompt = Prompt()

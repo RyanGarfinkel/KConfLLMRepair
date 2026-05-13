@@ -9,6 +9,7 @@ class BuildResult(BaseModel):
 class BootResult(BaseModel):
 	status: Literal['yes', 'maintenance', 'no'] = Field(..., frozen=True)
 	log: str = Field(..., frozen=True)
+	boot_time: float = Field(default=0.0, ge=0, frozen=True)
 
 class KlocalizerResult(BaseModel):
 	status: Literal['success', 'no-satisfying-constraints', 'error'] = Field(..., frozen=True)

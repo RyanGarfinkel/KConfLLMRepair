@@ -20,11 +20,13 @@ class Attempt(BaseModel):
 
     boot_succeeded: Literal['yes', 'maintenance', 'no'] = Field(default='no')
     boot_log: str | None = Field(default=None)
+    boot_time: float = Field(default=0.0, ge=0)
 
     tool_calls: list[ToolCall] = Field(default_factory=list)
     response: AgentResponse | None = Field(default=None)
     
     embedding_usage: EmbeddingUsage = Field(default_factory=EmbeddingUsage)
+    llm_time: float = Field(default=0.0, ge=0)
     token_usage: LLMUsage = Field(default=LLMUsage(input_tokens=0, output_tokens=0, total_tokens=0))
 
     def model_dump(self) -> dict:
@@ -40,6 +42,8 @@ class Attempt(BaseModel):
                 'build_time': self.build_time,
                 'boot_succeeded': self.boot_succeeded,
                 'boot_log': self.boot_log,
+                'boot_time': self.boot_time,
+                'llm_time': self.llm_time,
                 'total_token_usage': self.token_usage.total_tokens + self.embedding_usage.total_tokens + total_tool_call_tokens,
             },
             'token_usage': self.token_usage.model_dump(),

@@ -84,6 +84,7 @@ class Agent:
         boot = kernel.boot(dir)
         attempt.boot_log = boot.log
         attempt.boot_succeeded = boot.status
+        attempt.boot_time = boot.boot_time
 
         if boot.status == 'yes':
             log.info('Input configuration boots successfully. No repair needed.')
@@ -102,7 +103,9 @@ class Agent:
         attempt = Attempt(id=len(session.attempts), dir=dir)
         session.attempts.append(attempt)
 
+        llm_start = time.time()
         agent_response, token_usage, raw_response = self.__generate_response(llm, session)
+        attempt.llm_time = time.time() - llm_start
 
         attempt.token_usage = token_usage
         self.__save_raw_response(f'{dir}/raw-agent-response.json', raw_response)
@@ -135,7 +138,8 @@ class Agent:
         boot = kernel.boot(dir)
         attempt.boot_log = boot.log
         attempt.boot_succeeded = boot.status
-        
+        attempt.boot_time = boot.boot_time
+
     def __generate_response(self, llm: BaseChatModel, session: Session) -> tuple[AgentResponse | None, LLMUsage, dict]:
 
         tools = agent_tools.get(session)

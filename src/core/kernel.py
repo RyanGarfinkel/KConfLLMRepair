@@ -140,7 +140,9 @@ class Kernel:
             log.error('Kernel binary not found. Please build the kernel before booting.')
             return BootResult(status='no', log=log_path)
 
+        start = time.time()
         status = qemu.test(self.src, log_path)
+        boot_time = time.time() - start
 
         if status == 'no':
             log.error('QEMU test failed. Check log for details.')
@@ -149,4 +151,4 @@ class Kernel:
         else:
             log.success('QEMU test completed successfully.')
 
-        return BootResult(status=status, log=log_path)
+        return BootResult(status=status, log=log_path, boot_time=boot_time)

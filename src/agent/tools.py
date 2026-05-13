@@ -13,7 +13,7 @@ class AgentTools:
     def __grep(self, path: str, pattern: str) -> list[str]:
 
         if not os.path.exists(path):
-                return [f'{path} does not exist.']
+            return [f'{path} does not exist.']
 
         try:
             compiled = re.compile(pattern, re.IGNORECASE)
@@ -24,9 +24,17 @@ class AgentTools:
         with open(path, 'r', errors='replace') as f:
             for i, line in enumerate(f, 1):
                 if compiled.search(line):
-                    results.append(f'{i + 1}: {line.strip()}')
-        
-        return results[-50:]
+                    results.append(f'{i}: {line.strip()}')
+
+        if not results:
+            return [f'No matches found for "{pattern}". Try a broader or different pattern.']
+
+        total = len(results)
+        truncated = results[:50]
+        if total > 50:
+            truncated.append(f'... {total - 50} more matches not shown. Narrow your pattern to see more relevant results.')
+
+        return truncated
     
     def __chunk(self, path: str, line: int) -> list[str]:
         
@@ -207,12 +215,14 @@ class AgentTools:
         @tool
         def grep_build_log(pattern: str) -> str:
             """
-            Search for specific patterns in the build log of the latest attempt.
+            Search the build log of the latest attempt for lines matching a pattern.
+            Start broad — patterns like "error:" are a good starting point — then narrow
+            based on what you find. If nothing matches, try a simpler or shorter pattern.
 
             Args:
-                pattern (str): A string pattern to search for in the build log.
+                pattern (str): Regex pattern to search for. Keep it broad - specific strings often match nothing.
             Returns:
-                str: A string containing the lines from the build log that match the pattern.
+                str: Matching lines with line numbers, or a message indicating no matches.
             """
             results = self.__grep(prev_attempt.build_log, pattern)
             session.attempts[-1].tool_calls.append(ToolCall(
@@ -245,12 +255,15 @@ class AgentTools:
         @tool
         def grep_boot_log(pattern: str) -> str:
             """
-            Search for specific patterns in the boot log of the latest attempt.
+            Search the boot log of the latest attempt for lines matching a pattern.
+            Start broad — patterns like "error|panic|failed" or "BUG|WARNING" are good
+            starting points — then narrow based on what you find. If nothing matches,
+            try a simpler or shorter pattern.
 
             Args:
-                pattern (str): A string pattern to search for in the boot log.
+                pattern (str): Regex pattern to search for. Keep it broad - specific strings often match nothing.
             Returns:
-                str: A string containing the lines from the boot log that match the pattern.
+                str: Matching lines with line numbers, or a message indicating no matches.
             """
             results = self.__grep(prev_attempt.boot_log, pattern)
             session.attempts[-1].tool_calls.append(ToolCall(
@@ -295,11 +308,13 @@ class AgentTools:
 
     def get(self, session: Session) -> list[StructuredTool]:
 
+        prev_config = session.attempts[-2].config if len(session.attempts) >= 2 else None
+
         @tool
         def search_original_config(options: list[str]) -> str:
             """
             Search for the presence of specific configuration options in the original config file.
-            
+
             Args:
                 options (list[str]): A list of configuration options to search for in the original config file.
             Returns:
@@ -313,18 +328,18 @@ class AgentTools:
             ))
 
             return results
-        
+
         @tool
         def search_latest_config(options: list[str]) -> str:
             """
             Search for the presence of specific configuration options in the latest modified config file.
-            
+
             Args:
                 options (list[str]): A list of configuration options to search for in the latest modified config file.
             Returns:
                 str: A string containing the values of the options searched for that were found in the latest modified config file.
             """
-            results = self.__search_config(session.latest, options)
+            results = self.__search_config(prev_config, options)
             session.attempts[-1].tool_calls.append(ToolCall(
                 name='search_latest_config',
                 args={ 'options': options },
@@ -335,7 +350,7 @@ class AgentTools:
 
         tools = [search_original_config]
 
-        if session.latest is not None or len(session.attempts) == 1:
+        if prev_config is not None and prev_config != session.base:
             tools.append(search_latest_config)
 
         if settings.runtime.USE_RAG:
