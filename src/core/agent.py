@@ -53,7 +53,9 @@ class Agent:
             shutil.copyfile(session.attempts[-1].config, f'{output_dir}/repaired.config')
         elif session.status == 'success-maintenance':
             log.info('Repair process completed, but the kernel boots into maintenance mode.')
-            shutil.copyfile(session.attempts[-1].config, f'{output_dir}/repaired.config')
+            maintenance_config = next((a.config for a in reversed(session.attempts) if a.boot_succeeded == 'maintenance'), None)
+            if maintenance_config:
+                shutil.copyfile(maintenance_config, f'{output_dir}/repaired.config')
         else:
             log.error('Repair process failed. Maximum iterations reached without success.')
 

@@ -9,6 +9,7 @@ langchain-openai
 langchain-core
 google-genai
 pytest-mock
+pytest-cov
 langchain
 faiss-cpu
 GitPython
