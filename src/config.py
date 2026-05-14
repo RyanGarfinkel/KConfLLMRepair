@@ -165,3 +165,4 @@ def log_settings():
     print(f'[INFO] debian image: {settings.kernel.DEBIAN_IMG}')
     print(f'[INFO] max tool calls: {settings.agent.MAX_TOOL_CALLS}')
     print(f'[INFO] max iterations: {settings.agent.MAX_ITERATIONS}')
+    print(f'[INFO] jobs: {settings.runtime.JOBS}')

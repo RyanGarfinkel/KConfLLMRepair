@@ -17,7 +17,7 @@ class Qemu:
             return 'maintenance'
 
         try:
-            with open(log_file, encoding='utf-8') as f:
+            with open(log_file, encoding='utf-8', errors='replace') as f:
                 log = f.read()
             if 'Kernel panic' in log:
                 return 'panic'
