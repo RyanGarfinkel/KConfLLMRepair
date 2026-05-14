@@ -66,6 +66,7 @@ jobs:
 
   test:
     needs: lint
+    if: needs.lint.result == 'success'
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/ryangarfinkel/kconfllmrepair:latest
