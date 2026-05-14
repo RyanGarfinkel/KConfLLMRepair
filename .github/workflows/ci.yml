@@ -65,8 +65,11 @@ jobs:
         run: pylint src/ --fail-under=9.75
 
   test:
-    needs: lint
-    if: needs.lint.result == 'success'
+    needs: [build-image, lint]
+    if: |
+      always() &&
+      needs.lint.result == 'success' &&
+      (needs.build-image.result == 'success' || needs.build-image.result == 'skipped')
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/ryangarfinkel/kconfllmrepair:latest
