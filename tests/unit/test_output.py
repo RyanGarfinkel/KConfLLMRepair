@@ -6,7 +6,6 @@ from src.config import settings
 from src.agent import Session
 import pytest
 
-
 @pytest.fixture(autouse=True)
 def restore_settings():
 	saved_output = settings.runtime.OUTPUT_DIR
@@ -15,17 +14,14 @@ def restore_settings():
 	settings.runtime.OUTPUT_DIR = saved_output
 	settings.agent.MAX_ITERATIONS = saved_iterations
 
-
 @pytest.fixture
 def repair_input(tmp_path):
 	p = tmp_path / 'test.config'
 	p.touch()
 	return Input(original_config=str(p))
 
-
 def _attempt(id, dir, config=None, boot='no'):
 	return Attempt(id=id, dir=str(dir), config=config, boot_succeeded=boot)
-
 
 def _run_repair(repair_input, initial, side_effect):
 	with ExitStack() as stack:
@@ -37,7 +33,6 @@ def _run_repair(repair_input, initial, side_effect):
 		mock_copy = stack.enter_context(patch('src.core.agent.shutil.copyfile'))
 		agent.repair(repair_input, MagicMock())
 	return mock_copy
-
 
 # Repair output: Success
 def test_success(repair_input, tmp_path):

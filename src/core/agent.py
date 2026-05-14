@@ -79,6 +79,7 @@ class Agent:
         build = kernel.build(dir, session.base)
         attempt.build_log = build.log
         attempt.build_time = build.build_time
+        attempt.build_summary = build.summary
         if not build.ok:
             log.info('Build failed with the input configuration.')
             return attempt
@@ -87,6 +88,7 @@ class Agent:
         attempt.boot_log = boot.log
         attempt.boot_succeeded = boot.status
         attempt.boot_time = boot.boot_time
+        attempt.boot_summary = boot.summary
 
         if boot.status == 'yes':
             log.info('Input configuration boots successfully. No repair needed.')
@@ -106,10 +108,11 @@ class Agent:
         session.attempts.append(attempt)
 
         llm_start = time.time()
-        agent_response, token_usage, raw_response = self.__generate_response(llm, session)
+        agent_response, token_usage, raw_response, wrapper_used = self.__generate_response(llm, session)
         attempt.llm_time = time.time() - llm_start
 
         attempt.token_usage = token_usage
+        attempt.wrapper_used = wrapper_used
         self.__save_raw_response(f'{dir}/raw-agent-response.json', raw_response)
 
         if agent_response is None:
@@ -132,6 +135,7 @@ class Agent:
         build = kernel.build(dir, attempt.config)
         attempt.build_log = build.log
         attempt.build_time = build.build_time
+        attempt.build_summary = build.summary
         if not build.ok:
             return
 
@@ -141,18 +145,21 @@ class Agent:
         attempt.boot_log = boot.log
         attempt.boot_succeeded = boot.status
         attempt.boot_time = boot.boot_time
+        attempt.boot_summary = boot.summary
 
-    def __generate_response(self, llm: BaseChatModel, session: Session) -> tuple[AgentResponse | None, LLMUsage, dict]:
+    def __generate_response(self, llm: BaseChatModel, session: Session) -> tuple[AgentResponse | None, LLMUsage, dict, bool]:
 
         tools = agent_tools.get(session)
         agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
-        
+
         response = agent.invoke({ 'messages': prompt.prompt(session) })
 
         usage = LLMUsage.from_response(response)
         agent_response = response.get('structured_response', None)
+        wrapper_used = False
 
         if agent_response is None:
+            wrapper_used = True
             try:
                 result = llm.with_structured_output(AgentResponse, include_raw=True).invoke(response['messages'])
                 if result.get('raw'):
@@ -162,7 +169,7 @@ class Agent:
             except Exception:
                 pass
 
-        return agent_response, usage, response
+        return agent_response, usage, response, wrapper_used
 
     def __apply_hard_constraints(self, define: list[str], undefine: list[str], hard_define: set[str], hard_undefine: set[str]) -> tuple[list[str], list[str]]:
         

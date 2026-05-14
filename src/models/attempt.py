@@ -18,12 +18,15 @@ class Attempt(BaseModel):
     build_log: str | None = Field(default=None)
     build_time: float = Field(default=0.0, ge=0)
 
-    boot_succeeded: Literal['yes', 'maintenance', 'no'] = Field(default='no')
+    boot_succeeded: Literal['yes', 'maintenance', 'panic', 'timeout', 'no'] = Field(default='no')
     boot_log: str | None = Field(default=None)
     boot_time: float = Field(default=0.0, ge=0)
+    boot_summary: str | None = Field(default=None)
+    build_summary: str | None = Field(default=None)
 
     tool_calls: list[ToolCall] = Field(default_factory=list)
     response: AgentResponse | None = Field(default=None)
+    wrapper_used: bool = Field(default=False)
     
     embedding_usage: EmbeddingUsage = Field(default_factory=EmbeddingUsage)
     llm_time: float = Field(default=0.0, ge=0)
@@ -43,7 +46,11 @@ class Attempt(BaseModel):
                 'boot_succeeded': self.boot_succeeded,
                 'boot_log': self.boot_log,
                 'boot_time': self.boot_time,
+                'boot_summary': self.boot_summary,
+                'build_summary': self.build_summary,
                 'llm_time': self.llm_time,
+                'tool_call_count': len(self.tool_calls),
+                'wrapper_used': self.wrapper_used,
                 'total_token_usage': self.token_usage.total_tokens + self.embedding_usage.total_tokens + total_tool_call_tokens,
             },
             'token_usage': self.token_usage.model_dump(),

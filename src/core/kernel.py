@@ -124,7 +124,7 @@ class Kernel:
 
         if not ok:
             log.error('Build failed. Check log for details.')
-            return BuildResult(ok=False, log=log_path, build_time=build_time)
+            return BuildResult(ok=False, log=log_path, build_time=build_time, summary=self.__extract_build_summary(log_path))
 
         log.success('Build completed successfully.')
 
@@ -144,11 +144,51 @@ class Kernel:
         status = qemu.test(self.src, log_path)
         boot_time = time.time() - start
 
-        if status == 'no':
-            log.error('QEMU test failed. Check log for details.')
+        if status == 'yes':
+            log.success('QEMU test completed successfully.')
         elif status == 'maintenance':
             log.warning('QEMU test returned maintenance mode.')
+        elif status == 'panic':
+            log.error('Kernel panic detected.')
+        elif status == 'timeout':
+            log.error('Boot timed out.')
         else:
-            log.success('QEMU test completed successfully.')
+            log.error('QEMU process failed. Check log for details.')
 
-        return BootResult(status=status, log=log_path, boot_time=boot_time)
+        return BootResult(status=status, log=log_path, boot_time=boot_time, summary=self.__extract_boot_summary(log_path, status))
+
+    def __extract_build_summary(self, log_path: str) -> str | None:
+        try:
+            with open(log_path, encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+        except OSError:
+            return None
+
+        start = max(0, len(lines) - 50)
+        return ''.join(f'{start + j}: {l}' for j, l in enumerate(lines[start:])).strip() or None
+
+    def __extract_boot_summary(self, log_path: str, status: str) -> str | None:
+        try:
+            with open(log_path, encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+        except OSError:
+            return None
+
+        if not lines:
+            return None
+
+        if status == 'panic':
+            for i, line in enumerate(lines):
+                if 'Kernel panic' in line:
+                    return ''.join(f'{i + j}: {l}' for j, l in enumerate(lines[i:i + 25])).strip()
+            return None
+
+        if status == 'timeout':
+            start = max(0, len(lines) - 50)
+            return ''.join(f'{start + j}: {l}' for j, l in enumerate(lines[start:])).strip()
+
+        if status == 'maintenance':
+            failed = [(i, l) for i, l in enumerate(lines) if 'FAILED' in l]
+            return ''.join(f'{i}: {l}' for i, l in failed[:20]).strip() or None
+
+        return None

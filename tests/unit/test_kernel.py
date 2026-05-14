@@ -1,5 +1,6 @@
 from unittest.mock import patch, MagicMock
 from src.core.kernel import Kernel
+from src.config import settings
 import pytest
 import os
 
@@ -14,6 +15,13 @@ def fake_kernel_src(tmp_path):
 	)
 	(tmp_path / '.config').touch()
 	return str(tmp_path)
+
+@pytest.fixture
+def fake_bzimage(fake_kernel_src):
+	bzimage = os.path.join(fake_kernel_src, settings.kernel.BZIMAGE)
+	os.makedirs(os.path.dirname(bzimage), exist_ok=True)
+	open(bzimage, 'w').close()
+	return fake_kernel_src
 
 @pytest.fixture
 def config_file(tmp_path):
@@ -97,6 +105,7 @@ def test_build_success(fake_kernel_src, config_file, tmp_path):
 	with patch('src.core.kernel.builder.build', return_value=True):
 		result = kernel.build(str(tmp_path), config_file)
 	assert result.ok is True
+	assert result.summary is None
 
 # Build: Failure
 def test_build_failure(fake_kernel_src, config_file, tmp_path):
@@ -104,6 +113,61 @@ def test_build_failure(fake_kernel_src, config_file, tmp_path):
 	with patch('src.core.kernel.builder.build', return_value=False):
 		result = kernel.build(str(tmp_path), config_file)
 	assert result.ok is False
+
+# Build summary from log tail: Success
+def test_build_failure_includes_summary(fake_kernel_src, config_file, tmp_path):
+	kernel = Kernel(fake_kernel_src)
+	(tmp_path / 'build.log').write_text(''.join(f'line {i}\n' for i in range(60)))
+	with patch('src.core.kernel.builder.build', return_value=False):
+		result = kernel.build(str(tmp_path), config_file)
+	assert result.summary is not None
+	assert '10:' in result.summary
+
+# Boot no bzimage: Failure
+def test_boot_no_bzimage(fake_kernel_src, tmp_path):
+	kernel = Kernel(fake_kernel_src)
+	result = kernel.boot(str(tmp_path))
+	assert result.status == 'no'
+	assert result.summary is None
+
+# Boot panic: Success
+def test_boot_panic(fake_bzimage, tmp_path):
+	kernel = Kernel(fake_bzimage)
+	(tmp_path / 'boot.log').write_text(
+		'early output\n' * 5 +
+		'Kernel panic - not syncing: VFS: Unable to mount root fs\n' +
+		'CPU: 0 PID: 1 Comm: swapper\n'
+	)
+	with patch('src.core.kernel.qemu.test', return_value='panic'):
+		result = kernel.boot(str(tmp_path))
+	assert result.status == 'panic'
+	assert result.summary is not None
+	assert 'Kernel panic' in result.summary
+
+# Boot timeout: Success
+def test_boot_timeout(fake_bzimage, tmp_path):
+	kernel = Kernel(fake_bzimage)
+	(tmp_path / 'boot.log').write_text(''.join(f'boot line {i}\n' for i in range(100)))
+	with patch('src.core.kernel.qemu.test', return_value='timeout'):
+		result = kernel.boot(str(tmp_path))
+	assert result.status == 'timeout'
+	assert result.summary is not None
+	assert '70:' in result.summary
+
+# Boot maintenance: Success
+def test_boot_maintenance(fake_bzimage, tmp_path):
+	kernel = Kernel(fake_bzimage)
+	(tmp_path / 'boot.log').write_text(
+		'normal output\n' * 10 +
+		'[[0;1;31mFAILED[0m] Failed to mount /proc\n' +
+		'more output\n' +
+		'[[0;1;31mFAILED[0m] Failed to start Journal Service\n'
+	)
+	with patch('src.core.kernel.qemu.test', return_value='maintenance'):
+		result = kernel.boot(str(tmp_path))
+	assert result.status == 'maintenance'
+	assert result.summary is not None
+	assert 'FAILED' in result.summary
 
 # Make patch: Success
 def test_make_patch_success(fake_kernel_src, tmp_path):

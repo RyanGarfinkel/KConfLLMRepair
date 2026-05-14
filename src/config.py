@@ -163,3 +163,5 @@ def log_settings():
     print(f'[INFO] kernel-src {settings.kernel.KERNEL_SRC}')
     print(f'[INFO] target arch: {settings.kernel.ARCH}')
     print(f'[INFO] debian image: {settings.kernel.DEBIAN_IMG}')
+    print(f'[INFO] max tool calls: {settings.agent.MAX_TOOL_CALLS}')
+    print(f'[INFO] max iterations: {settings.agent.MAX_ITERATIONS}')
