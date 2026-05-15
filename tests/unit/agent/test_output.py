@@ -4,6 +4,7 @@ from contextlib import ExitStack
 from src.core.agent import agent
 from src.config import settings
 from src.agent import Session
+from src.agent import model
 import pytest
 
 @pytest.fixture(autouse=True)
@@ -18,6 +19,7 @@ def restore_settings():
 def repair_input(tmp_path):
 	p = tmp_path / 'test.config'
 	p.touch()
+
 	return Input(original_config=str(p))
 
 def _attempt(id, dir, config=None, boot='no'):
@@ -28,10 +30,11 @@ def _run_repair(repair_input, initial, side_effect):
 		stack.enter_context(patch.object(agent, '_Agent__make_dir'))
 		stack.enter_context(patch.object(agent, '_Agent__inital_attempt', return_value=initial))
 		stack.enter_context(patch.object(agent, '_Agent__attempt', side_effect=side_effect))
-		stack.enter_context(patch('src.core.agent.model.get_llm', return_value=MagicMock()))
+		stack.enter_context(patch.object(model, 'get_llm', return_value=MagicMock()))
 		stack.enter_context(patch.object(Session, 'save'))
-		mock_copy = stack.enter_context(patch('src.core.agent.shutil.copyfile'))
+		mock_copy = stack.enter_context(patch('shutil.copyfile'))
 		agent.repair(repair_input, MagicMock())
+		
 	return mock_copy
 
 # Repair output: Success
@@ -43,7 +46,7 @@ def test_success(repair_input, tmp_path):
 	repaired_config = str(tmp_path / 'repaired.config')
 	initial = _attempt(0, tmp_path)
 
-	def append_success(llm, kernel, session):
+	def append_success(_llm, _kernel, session):
 		session.attempts.append(_attempt(1, tmp_path, config=repaired_config, boot='yes'))
 
 	mock_copy = _run_repair(repair_input, initial, append_success)
@@ -59,7 +62,7 @@ def test_success_maintenance(repair_input, tmp_path):
 	initial = _attempt(0, tmp_path)
 	call_count = {'n': 0}
 
-	def append_attempts(llm, kernel, session):
+	def append_attempts(_llm, _kernel, session):
 		call_count['n'] += 1
 		if call_count['n'] == 1:
 			session.attempts.append(_attempt(1, tmp_path, config=maintenance_config, boot='maintenance'))
@@ -78,7 +81,7 @@ def test_max_attempts(repair_input, tmp_path):
 	initial = _attempt(0, tmp_path)
 	call_count = {'n': 0}
 
-	def append_failed(llm, kernel, session):
+	def append_failed(_llm, _kernel, session):
 		call_count['n'] += 1
 		session.attempts.append(_attempt(call_count['n'], tmp_path))
 

@@ -44,6 +44,13 @@ def test_kernel_version(fake_kernel_src):
 	kernel = Kernel(fake_kernel_src)
 	assert kernel.version == '7.0.0-rc1'
 
+# Kernel version cached: Success
+def test_kernel_version_cached(fake_kernel_src):
+	kernel = Kernel(fake_kernel_src)
+	first = kernel.version
+	second = kernel.version
+	assert first == second
+
 # Load config: Success
 def test_load_config_success(fake_kernel_src, config_file):
 	kernel = Kernel(fake_kernel_src)

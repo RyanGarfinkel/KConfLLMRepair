@@ -1,4 +1,7 @@
 from pydantic import BaseModel, Field, field_validator
+import re
+
+OPTION_PATTERN = r'CONFIG_[A-Z0-9_]+'
 
 class AgentResponse(BaseModel):
 
@@ -13,15 +16,23 @@ class AgentResponse(BaseModel):
         result = []
 
         for name in v:
-            name = name.strip()
-            if not name:
-                continue
+            name = ''.join(c for c in name.strip() if c.isascii()).upper()
+        
             if not name.startswith('CONFIG_'):
                 name = f'CONFIG_{name}'
-            if not name.isupper():
-                name = name.upper()
-            if '=' in name:
-                name = name.split('=')[0].strip()
-            result.append(name)
+
+            matches = re.findall(OPTION_PATTERN, name)
+            if not matches:
+                continue
+
+            name_lower = name.lower()
+            if 'undefine' in name_lower:
+                index = name_lower.find('undefine')
+                result.extend(re.findall(OPTION_PATTERN, name[:index]))
+            elif 'define' in name_lower:
+                index = name_lower.find('define')
+                result.extend(re.findall(OPTION_PATTERN, name[:index]))
+            else:
+                result.extend(matches)
         
         return result
