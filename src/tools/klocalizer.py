@@ -9,9 +9,6 @@ class KLocalizer:
 
     def run(self, kernel_src: str, log: str, define: list[str] = [], undefine: list[str] = []) -> Literal['success', 'no-satisfying-constraints', 'error']:
 
-        if set(define) & set(undefine):
-            return 'no-satisfying-constraints'
-
         parent = os.path.dirname(log)
 
         with open(f'{parent}/constraints.txt', 'w', encoding='utf-8') as f:
@@ -20,6 +17,9 @@ class KLocalizer:
 
             for option in undefine:
                 f.write(f'!{option}\n')
+
+        if set(define) & set(undefine):
+            return 'no-satisfying-constraints'
 
         cmd = ['bash', settings.scripts.RUN_KLOCALIZER_SCRIPT, kernel_src, f'{parent}/constraints.txt', log, settings.kernel.ARCH]
 
