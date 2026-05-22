@@ -57,7 +57,7 @@ class AgentSettings(BaseModel):
     MODEL: str = Field(default='gemini-3.1-pro-preview')
     @property
     def PROVIDER(self) -> str:
-        if self.MODEL.startswith('gemini'):
+        if self.MODEL.startswith('gemini') or self.MODEL.startswith('gemma'):
             return 'google'
         
         if self.MODEL.startswith('gpt'):

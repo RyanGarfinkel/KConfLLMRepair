@@ -31,7 +31,7 @@ def test_model_dump_with_response_and_tool_calls(tmp_path):
 	attempt = Attempt(
 		id=1,
 		dir=str(tmp_path),
-		config=str(tmp_path / 'config'),
+		config=f'{tmp_path}/config',
 		klocalizer_status='success',
 		build_succeeded=True,
 		boot_succeeded='yes',

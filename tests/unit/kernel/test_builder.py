@@ -1,9 +1,9 @@
 from unittest.mock import patch, MagicMock
 from src.kernel.builder import builder
 
-# Build kernel: Success
+# Build Returns True On Zero Exit Code: Success
 def test_build_success(tmp_path):
-	log_file = str(tmp_path / 'build.log')
+	log_file = f'{tmp_path}/build.log'
 	mock_result = MagicMock()
 	mock_result.returncode = 0
 	
@@ -12,9 +12,9 @@ def test_build_success(tmp_path):
 
 	assert result is True
 
-# Build kernel: Failure
+# Build Returns False On Non-Zero Exit Code: Failure
 def test_build_failure(tmp_path):
-	log_file = str(tmp_path / 'build.log')
+	log_file = f'{tmp_path}/build.log'
 	mock_result = MagicMock()
 	mock_result.returncode = 1
 

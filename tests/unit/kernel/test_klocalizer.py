@@ -5,7 +5,7 @@ import os
 
 @pytest.fixture
 def log_path(tmp_path):
-	return str(tmp_path / 'klocalizer.log')
+	return f'{tmp_path}/klocalizer.log'
 
 # Conflicting constraints: Failure
 def test_conflicting_constraints(log_path):
@@ -19,7 +19,7 @@ def test_run_success(log_path, tmp_path):
 	with patch('subprocess.run', return_value=mock_result):
 		result = klocalizer.run('/fake/src', log_path, define=['X'], undefine=['Y'])
 	assert result == 'success'
-	assert os.path.exists(str(tmp_path / 'constraints.txt'))
+	assert os.path.exists(f'{tmp_path}/constraints.txt')
 
 # Klocalizer returns no satisfying constraints: Failure
 def test_run_no_satisfying(log_path):
@@ -78,7 +78,7 @@ def test_constraints_file_content(log_path, tmp_path):
 	mock_result.returncode = 0
 	with patch('subprocess.run', return_value=mock_result):
 		klocalizer.run('/fake/src', log_path, define=['X'], undefine=['Y'])
-	with open(str(tmp_path / 'constraints.txt')) as f:
+	with open(f'{tmp_path}/constraints.txt') as f:
 		content = f.read()
 	assert 'X\n' in content
 	assert '!Y\n' in content

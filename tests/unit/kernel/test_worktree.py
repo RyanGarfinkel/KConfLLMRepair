@@ -8,7 +8,7 @@ worktree_module = sys.modules['src.kernel.worktree']
 # Create worktree: Success
 def test_create_returns_path(tmp_path):
 	commit = 'abc1234567890'
-	expected = str(tmp_path / f'{commit[:10]}_0')
+	expected = f'{tmp_path}/{commit[:10]}_0'
 	
 	with patch.object(worktree, 'main_repo'), \
 		 patch.object(worktree_module, 'Repo') as mock_repo_cls, \
@@ -22,7 +22,7 @@ def test_create_returns_path(tmp_path):
 def test_create_increments_path_on_collision(tmp_path):
 	commit = 'abc1234567890'
 	(tmp_path / f'{commit[:10]}_0').mkdir()
-	expected = str(tmp_path / f'{commit[:10]}_1')
+	expected = f'{tmp_path}/{commit[:10]}_1'
 
 	with patch.object(worktree, 'main_repo'), \
 		 patch.object(worktree_module, 'Repo') as mock_repo_cls, \
@@ -34,7 +34,7 @@ def test_create_increments_path_on_collision(tmp_path):
 
 # Cleanup existing worktree: Success
 def test_cleanup_existing(tmp_path):
-	path = str(tmp_path / 'worktree')
+	path = f'{tmp_path}/worktree'
 	tmp_path.joinpath('worktree').mkdir()
 
 	with patch.object(worktree, 'main_repo') as mock_repo:
@@ -45,7 +45,7 @@ def test_cleanup_existing(tmp_path):
 
 # Cleanup missing path: Success
 def test_cleanup_missing_path(tmp_path):
-	path = str(tmp_path / 'nonexistent')
+	path = f'{tmp_path}/nonexistent'
 	result = worktree.cleanup(path)
 	assert result is True
 
@@ -63,7 +63,7 @@ def test_cleanup_skips_kernel_src(tmp_path):
 
 # Cleanup git fails, shutil succeeds: Success
 def test_cleanup_git_fails_manual_succeeds(tmp_path):
-	path = str(tmp_path / 'worktree')
+	path = f'{tmp_path}/worktree'
 	tmp_path.joinpath('worktree').mkdir()
 
 	with patch.object(worktree, 'main_repo') as mock_repo, \
@@ -78,7 +78,7 @@ def test_cleanup_git_fails_manual_succeeds(tmp_path):
 
 # Cleanup git and shutil both fail: Failure
 def test_cleanup_both_methods_fail(tmp_path):
-	path = str(tmp_path / 'worktree')
+	path = f'{tmp_path}/worktree'
 	tmp_path.joinpath('worktree').mkdir()
 
 	with patch.object(worktree, 'main_repo') as mock_repo, \
