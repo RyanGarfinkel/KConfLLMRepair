@@ -198,8 +198,8 @@ def test_main_entrypoint(config_file, tmp_path):
 	original_module = sys.modules.pop('src.cli.repair')
 	try:
 		with patch('sys.argv', argv_patch), \
-			 patch('src.core.agent.repair'), \
-			 patch('src.core.kernel.Kernel'), \
+			 patch('src.cli.repair.agent.repair'), \
+			 patch('src.cli.repair.Kernel'), \
 			 patch('src.config.log_settings'):
 			try:
 				runpy.run_module('src.cli.repair', run_name='__main__')
