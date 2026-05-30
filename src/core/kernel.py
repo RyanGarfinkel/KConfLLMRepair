@@ -95,10 +95,14 @@ class Kernel:
 
         log.info('Running KLocalizer...')
 
+        start = time.time()
+
         if patch is not None:
             status = klocalizer.run_patch(self.src, patch, log_path, define, undefine)
         else:
             status = klocalizer.run(self.src, log_path, define, undefine)
+
+        klocalizer_time = time.time() - start
 
         if status == 'success':
             log.success('KLocalizer completed successfully.')
@@ -107,7 +111,7 @@ class Kernel:
         else:
             log.error('KLocalizer failed.')
 
-        return KlocalizerResult(status=status, log=log_path)
+        return KlocalizerResult(status=status, log=log_path, klocalizer_time=klocalizer_time)
 
     def build(self, dir: str, config: str) -> BuildResult:
 

@@ -126,6 +126,7 @@ class Agent:
         klocalizer = kernel.run_klocalizer(dir, session.base, define, undefine)
         attempt.klocalizer_log = klocalizer.log
         attempt.klocalizer_status = klocalizer.status
+        attempt.klocalizer_time = klocalizer.klocalizer_time
         if klocalizer.status != 'success':
             return
 

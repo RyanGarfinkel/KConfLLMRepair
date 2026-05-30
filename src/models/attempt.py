@@ -13,6 +13,7 @@ class Attempt(BaseModel):
 
     klocalizer_status: Literal['success', 'no-satisfying-constraints', 'error', 'not-run'] = Field(default='not-run')
     klocalizer_log: str | None = Field(default=None)
+    klocalizer_time: float = Field(default=0.0, ge=0)
 
     build_succeeded: bool = Field(default=False)
     build_log: str | None = Field(default=None)
@@ -39,6 +40,7 @@ class Attempt(BaseModel):
             'summary': {
                 'klocalizer_status': self.klocalizer_status,
                 'klocalizer_log': self.klocalizer_log,
+                'klocalizer_time': self.klocalizer_time,
                 'modified_config': self.config,
                 'build_succeeded': self.build_succeeded,
                 'build_log': self.build_log,

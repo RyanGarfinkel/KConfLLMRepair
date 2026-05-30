@@ -16,3 +16,4 @@ class BootResult(BaseModel):
 class KlocalizerResult(BaseModel):
 	status: Literal['success', 'no-satisfying-constraints', 'error'] = Field(..., frozen=True)
 	log: str = Field(..., frozen=True)
+	klocalizer_time: float = Field(default=0.0, ge=0, frozen=True)
