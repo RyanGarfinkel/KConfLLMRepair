@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     default-jdk libjson-java sat4j \
     qemu-system-x86 \
     qemu-system-arm \
+    qemu-efi-aarch64 \
     clang-15 llvm-15 lld-15 \
     gcc-x86-64-linux-gnu \
     gcc-aarch64-linux-gnu \
@@ -23,10 +24,8 @@ RUN apt-get update && apt-get install -y \
         update-alternatives --install /usr/bin/llvm-$tool llvm-$tool /usr/bin/llvm-$tool-15 100; \
     done
 
-# make.cross
-RUN wget https://raw.githubusercontent.com/intel/lkp-tests/master/kbuild/make.cross \
-        -O /usr/local/bin/make.cross \
-    && chmod +x /usr/local/bin/make.cross
+# make.cross alias
+RUN ln -sf "$(command -v make)" /usr/local/bin/make.cross
 
 # Z3
 ENV Z3_SRC=/opt/tools/z3
@@ -69,8 +68,11 @@ ENV CROSS_COMPILE=x86_64-linux-gnu-
 ENV LIBRARY_PATH=/root/.local/lib
 ENV ARCH=x86_64
 
-# Debian Image
+# Debian Images
 ENV DEBIAN_IMG=/opt/images/bullseye.img
+ENV DEBIAN_IMG_ARM64=/opt/images/bullseye-arm64.img
 RUN mkdir -p /opt/images \
     && wget https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-nocloud-amd64.raw \
-        -O $DEBIAN_IMG
+        -O $DEBIAN_IMG \
+    && wget https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-nocloud-arm64.raw \
+        -O $DEBIAN_IMG_ARM64

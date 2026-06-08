@@ -83,3 +83,8 @@ jobs:
         run: pytest tests/unit/
         env:
           GOOGLE_API_KEY: fake-key-for-ci
+
+      - name: Run integration tests
+        run: pytest tests/integration/
+        env:
+          GOOGLE_API_KEY: fake-key-for-ci

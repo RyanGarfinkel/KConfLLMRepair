@@ -23,14 +23,14 @@ if [ "$ARCH" = "arm64" ]; then
     qemu-system-aarch64 \
         -machine virt \
         -cpu cortex-a57 \
-        -nographic \
-        -smp 1 \
-        -drive file="$DEBIAN_IMG",format=raw,file.locking=off \
-        -kernel "$IMG" \
-        -append "console=ttyAMA0 earlycon=pl011,0x9000000 root=/dev/vda oops=panic panic_on_warn=1 panic=5 slub_debug=UZ" \
         -m 2G \
-        -net user \
-        -net nic > "$LOG_FILE" 2>&1 &
+        -smp 2 \
+        -kernel "$IMG" \
+        -append "console=ttyAMA0 root=/dev/vda earlycon=pl011,0x9000000 net.ifnames=0" \
+        -drive file="$DEBIAN_IMG",format=raw,file.locking=off,snapshot=on \
+        -net user,host=10.0.2.10 \
+        -net nic,model=virtio-net-pci \
+        -nographic > "$LOG_FILE" 2>&1 &
 else
     qemu-system-x86_64 \
         -m 2G \

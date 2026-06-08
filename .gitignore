@@ -2,5 +2,6 @@
 __pycache__/
 workspace/
 config/
+*.pdf
 venv/
 .env
