@@ -1,5 +1,4 @@
 from src.config import settings
-from pathlib import Path
 import subprocess
 import hashlib
 import shutil
@@ -26,22 +25,12 @@ def _image(env):
 	return os.environ.get(env, '')
 
 def _firmware():
-	return next((p for p in AAVMF_PATHS if Path(p).exists()), None)
+	return next((p for p in AAVMF_PATHS if os.path.exists(p)), None)
 
 def _setup(qemu, env, machine):
-	if shutil.which(qemu) is None:
-		pytest.skip(f'{qemu} not installed')
-
 	image = _image(env)
-	if not image or not Path(image).exists():
-		pytest.skip(f'{env} not available')
-
 	if qemu == 'qemu-system-aarch64':
-		firmware = _firmware()
-		if firmware is None:
-			pytest.skip('arm64 UEFI firmware (qemu-efi-aarch64) not installed')
-		machine = [*machine, '-bios', firmware]
-
+		machine = [*machine, '-bios', _firmware()]
 	return image, machine
 
 def _sha256(path):
@@ -75,8 +64,18 @@ def _boot_and_kill(qemu, machine, image, snapshot, log):
 @pytest.mark.parametrize('qemu,env,machine', CASES, ids=['x86', 'arm64'])
 def test_snapshot_protects_base(qemu, env, machine, tmp_path):
 	image, machine = _setup(qemu, env, machine)
-	base = tmp_path / 'base.img'
+	base = f'{tmp_path}/base.img'
 	shutil.copy(image, base)
 	before = _sha256(base)
-	_boot_and_kill(qemu, machine, base, snapshot=True, log=tmp_path / 'snapshot.log')
+	_boot_and_kill(qemu, machine, base, snapshot=True, log=f'{tmp_path}/snapshot.log')
 	assert _sha256(base) == before
+
+# Without snapshot the same dirty boot and kill mutates the base image: Success
+@pytest.mark.parametrize('qemu,env,machine', CASES, ids=['x86', 'arm64'])
+def test_without_snapshot_mutates_base(qemu, env, machine, tmp_path):
+	image, machine = _setup(qemu, env, machine)
+	base = f'{tmp_path}/base.img'
+	shutil.copy(image, base)
+	before = _sha256(base)
+	_boot_and_kill(qemu, machine, base, snapshot=False, log=f'{tmp_path}/plain.log')
+	assert _sha256(base) != before
