@@ -1,20 +1,19 @@
-from pydantic import BaseModel, Field, field_validator, computed_field, model_validator
+from pydantic import BaseModel, Field, field_validator, computed_field
 from functools import cached_property
 import os
 
 class Input(BaseModel):
 
-	original_config: str = Field(..., frozen=True)
-	modified_config: str | None = Field(default=None, frozen=True)
+	config: str = Field(..., frozen=True)
 	patch: str | None = Field(default=None, frozen=True)
 	hard_constraints: str | None = Field(default=None, frozen=True)
 
-	@field_validator('original_config', 'modified_config', 'patch')
+	@field_validator('config', 'patch')
 	@classmethod
 	def validate_file_exists(cls, v: str | None) -> str | None:
 		if v is not None and not os.path.exists(v):
 			raise ValueError(f'File {v} does not exist.')
-		
+
 		return os.path.abspath(v) if v is not None else None
 
 	@field_validator('hard_constraints')
@@ -22,15 +21,8 @@ class Input(BaseModel):
 	def validate_constraints_exists(cls, v: str | None) -> str | None:
 		if v is not None and not os.path.exists(v):
 			raise ValueError(f'Constraints file {v} does not exist.')
-		
-		return os.path.abspath(v) if v is not None else None
 
-	@model_validator(mode='after')
-	def validate_mode(self):
-		if (self.modified_config is None) != (self.patch is None):
-			raise ValueError('--modified and --patch must be provided together.')
-		
-		return self
+		return os.path.abspath(v) if v is not None else None
 
 	@computed_field
 	@cached_property

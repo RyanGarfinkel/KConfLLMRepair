@@ -39,6 +39,7 @@ class RuntimeSettings(BaseModel):
     CHUNK_WINDOW: int = 20
     CLEANUP: bool = Field(default=False)
     USE_RAG: bool = Field(default=False)
+    MIN_COVERAGE: float = Field(default=0.0, ge=0.0, le=1.0)
 
     OUTPUT_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
 
@@ -112,7 +113,12 @@ class ScriptSettings(BaseModel):
     def RUN_KLOCALIZER_PATCH_SCRIPT(self) -> str:
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-klocalizer-patch.sh')
         return os.path.abspath(path)
-    
+
+    @property
+    def RUN_KOVERAGE_SCRIPT(self) -> str:
+        path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-koverage.sh')
+        return os.path.abspath(path)
+
     @property
     def SYZ_KCONF_SCRIPT(self) -> str:
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'syz-kconf.sh')
@@ -166,3 +172,4 @@ def log_settings():
     print(f'[INFO] max tool calls: {settings.agent.MAX_TOOL_CALLS}')
     print(f'[INFO] max iterations: {settings.agent.MAX_ITERATIONS}')
     print(f'[INFO] jobs: {settings.runtime.JOBS}')
+    print(f'[INFO] min coverage: {settings.runtime.MIN_COVERAGE}')

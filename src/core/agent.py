@@ -23,43 +23,49 @@ class Agent:
         output_dir = settings.runtime.OUTPUT_DIR
         self.__make_dir(output_dir)
 
-        session = Session(input.original_config, output_dir, patch=input.patch, hard_define=input.define, hard_undefine=input.undefine)
+        session = Session(input.config, output_dir, patch=input.patch, hard_define=input.define, hard_undefine=input.undefine)
         llm = model.get_llm()
 
         inital_attempt = self.__inital_attempt(kernel, session)
         session.attempts.append(inital_attempt)
 
-        if inital_attempt.boot_succeeded == 'yes':
-            session.end_time = time.time()
-            return session
+        if not self.__is_repaired(session):
+            log.info('Beginning repair process...')
 
-        log.info('Beginning repair process...')
+            for i in range(settings.agent.MAX_ITERATIONS):
 
-        for i in range(settings.agent.MAX_ITERATIONS):
-            
-            if session.status in ('success', 'success-maintenance'):
-                break
+                if self.__is_repaired(session):
+                    break
 
-            log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS}...')
+                log.info(f'Iteration {i + 1} / {settings.agent.MAX_ITERATIONS}...')
 
-            self.__attempt(llm, kernel, session)
+                self.__attempt(llm, kernel, session)
 
-            session.save(f'{output_dir}/summary.json')
+                session.save(f'{output_dir}/summary.json')
 
         session.end_time = time.time()
 
         if session.status == 'success':
             log.success('Repair process completed successfully!')
-            shutil.copyfile(session.attempts[-1].config, f'{output_dir}/repaired.config')
+            shutil.copyfile(session.best_attempt.config, f'{output_dir}/repaired.config')
         elif session.status == 'success-maintenance':
             log.info('Repair process completed, but the kernel boots into maintenance mode.')
-            maintenance_config = next((a.config for a in reversed(session.attempts) if a.boot_succeeded == 'maintenance'), None)
-            if maintenance_config:
-                shutil.copyfile(maintenance_config, f'{output_dir}/repaired.config')
+            shutil.copyfile(session.best_attempt.config, f'{output_dir}/repaired.config')
         else:
             log.error('Repair process failed. Maximum iterations reached without success.')
 
         return session
+
+    def __is_repaired(self, session: Session) -> bool:
+
+        best = session.best_attempt
+        if best is None or best.boot_succeeded != 'yes':
+            return False
+
+        if session.patch is None or settings.runtime.MIN_COVERAGE <= 0:
+            return True
+
+        return best.coverage is not None and best.coverage > settings.runtime.MIN_COVERAGE
     
     def __make_dir(self, path: str):
         if os.path.exists(path):
@@ -91,13 +97,31 @@ class Agent:
         attempt.boot_summary = boot.summary
 
         if boot.status == 'yes':
-            log.info('Input configuration boots successfully. No repair needed.')
+            log.info('Input configuration boots successfully.')
         elif boot.status == 'maintenance':
             log.info('Input configuration boots into maintenance mode.')
         else:
             log.info('Input configuration failed to boot.')
 
+        self.__get_coverage(kernel, session, dir, attempt)
+
         return attempt
+
+    def __get_coverage(self, kernel: Kernel, session: Session, dir: str, attempt: Attempt):
+
+        if session.patch is None or settings.runtime.MIN_COVERAGE == 0:
+            return
+
+        if attempt.boot_succeeded not in ('yes', 'maintenance'):
+            return
+
+        result = kernel.run_koverage(dir, session.patch)
+        attempt.coverage = result.coverage
+        attempt.coverage_report = result.coverage_report
+        attempt.coverage_summary = result.summary
+        attempt.koverage_status = result.status
+        attempt.koverage_log = result.log
+        attempt.koverage_time = result.koverage_time
 
     def __attempt(self, llm: BaseChatModel, kernel: Kernel, session: Session):
 
@@ -147,6 +171,8 @@ class Agent:
         attempt.boot_succeeded = boot.status
         attempt.boot_time = boot.boot_time
         attempt.boot_summary = boot.summary
+
+        self.__get_coverage(kernel, session, dir, attempt)
 
     def __generate_response(self, llm: BaseChatModel, session: Session) -> tuple[AgentResponse | None, LLMUsage, dict, bool]:
 

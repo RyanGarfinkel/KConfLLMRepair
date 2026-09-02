@@ -17,3 +17,11 @@ class KlocalizerResult(BaseModel):
 	status: Literal['success', 'no-satisfying-constraints', 'error'] = Field(..., frozen=True)
 	log: str = Field(..., frozen=True)
 	klocalizer_time: float = Field(default=0.0, ge=0, frozen=True)
+
+class KoverageResult(BaseModel):
+	status: Literal['success', 'error'] = Field(..., frozen=True)
+	coverage: float | None = Field(default=None, frozen=True)
+	coverage_report: str | None = Field(default=None, frozen=True)
+	log: str = Field(..., frozen=True)
+	koverage_time: float = Field(default=0.0, ge=0, frozen=True)
+	summary: str | None = Field(default=None, frozen=True)

@@ -25,6 +25,13 @@ class Attempt(BaseModel):
     boot_summary: str | None = Field(default=None)
     build_summary: str | None = Field(default=None)
 
+    coverage: float | None = Field(default=None)
+    coverage_report: str | None = Field(default=None)
+    coverage_summary: str | None = Field(default=None)
+    koverage_status: Literal['success', 'error', 'not-run'] = Field(default='not-run')
+    koverage_log: str | None = Field(default=None)
+    koverage_time: float = Field(default=0.0, ge=0)
+
     tool_calls: list[ToolCall] = Field(default_factory=list)
     response: AgentResponse | None = Field(default=None)
     wrapper_used: bool = Field(default=False)
@@ -50,6 +57,12 @@ class Attempt(BaseModel):
                 'boot_time': self.boot_time,
                 'boot_summary': self.boot_summary,
                 'build_summary': self.build_summary,
+                'coverage': self.coverage,
+                'coverage_report': self.coverage_report,
+                'coverage_summary': self.coverage_summary,
+                'koverage_status': self.koverage_status,
+                'koverage_log': self.koverage_log,
+                'koverage_time': self.koverage_time,
                 'llm_time': self.llm_time,
                 'tool_call_count': len(self.tool_calls),
                 'wrapper_used': self.wrapper_used,

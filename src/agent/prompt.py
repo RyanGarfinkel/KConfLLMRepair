@@ -12,9 +12,9 @@ class Prompt:
 		return SystemMessage(content=
 			self.__role() +
 			self.__kconfig_explanation() +
-			self.__workflow() +
+			self.__workflow(session) +
 			self.__constraints(session) +
-			self.__goal()
+			self.__goal(session)
 		)
 
 	def user(self, session: Session) -> HumanMessage:
@@ -48,7 +48,7 @@ class Prompt:
 			'additional options beyond what you specify to satisfy the dependency graph.\n\n'
 		)
 
-	def __workflow(self) -> str:
+	def __workflow(self, session: Session) -> str:
 		if settings.runtime.USE_RAG:
 			log_instruction = (
 				'Use semantic search queries describing the failure mode or kernel subsystem '
@@ -59,8 +59,8 @@ class Prompt:
 				'Use grep with targeted patterns like "error:" or "panic". '
 				'Use chunk to get surrounding context around a specific line number.'
 			)
-		
-		return (
+
+		content = (
 			'WORKFLOW\n'
 			'Follow these steps in order each attempt:\n'
 			'1. Read the attempt history. Identify the current failure stage (klocalizer / build / boot) '
@@ -73,8 +73,17 @@ class Prompt:
 			'5. If the same error persists after defining an option, the root cause is likely a missing '
 			'dependency. Search for related options or grep the config for options referenced in the error.\n'
 			'6. Respond with the complete cumulative define and undefine lists and clear reasoning '
-			'explaining which error each change addresses.\n\n'
+			'explaining which error each change addresses.\n'
 		)
+
+		if session.patch is not None and settings.runtime.MIN_COVERAGE > 0:
+			content += (
+				'7. If the config boots but coverage is still below target, use the get_file_coverage and the patch '
+				'tools to see which parts of the patch are excluded, then suggest options to include that maximize '
+				'patch coverage.\n'
+			)
+
+		return content + '\n'
 
 	def __constraints(self, session: Session) -> str:
 		hard = ''
@@ -90,12 +99,17 @@ class Prompt:
 			f'rather than exhausting the budget without responding.\n{hard}\n'
 		)
 
-	def __goal(self) -> str:
-		return (
+	def __goal(self, session: Session) -> str:
+		content = (
 			'GOAL\n'
 			'Repair the config so the kernel boots successfully. '
 			f'You have at most {settings.agent.MAX_ITERATIONS} attempts.'
 		)
+
+		if session.patch is not None and settings.runtime.MIN_COVERAGE > 0:
+			content += f' The config must also cover more than {(settings.runtime.MIN_COVERAGE * 100):.1f}% of the patch.'
+
+		return content
 
 	def __instructions(self, attempt_num: int) -> str:
 		return (
@@ -126,15 +140,20 @@ class Prompt:
 			content += f'\nCURRENT BUILD ERRORS\n{attempt.build_summary}\n'
 		elif attempt.boot_summary:
 			content += f'\nCURRENT BOOT FAILURE ({attempt.boot_succeeded})\n{attempt.boot_summary}\n'
+		elif attempt.boot_succeeded == 'yes' and attempt.coverage_summary:
+			content += f'\nCURRENT COVERAGE\n{attempt.coverage_summary}\n'
 		return content
 
 	def __format_initial(self, attempt: Attempt) -> str:
 		build_status = 'Success' if attempt.build_succeeded else 'Failed'
-		return (
+		content = (
 			'Initial config test:\n'
 			f'  Build: {build_status}\n'
 			f'  Boot:  {attempt.boot_succeeded}\n'
 		)
+		if attempt.coverage is not None:
+			content += f'  Coverage: {(attempt.coverage * 100):.1f}%\n'
+		return content
 
 	def __format_attempt(self, i: int, attempt: Attempt) -> str:
 		define = attempt.response.define if attempt.response else None
@@ -142,14 +161,19 @@ class Prompt:
 		reasoning = attempt.response.reasoning if attempt.response else None
 		build_status = 'Success' if attempt.build_succeeded else 'Failed'
 
-		return (
+		content = (
 			f'\nAttempt {i} / {settings.agent.MAX_ITERATIONS}:\n'
 			f'  KLocalizer: {attempt.klocalizer_status}\n'
 			f'  Build:      {build_status}\n'
 			f'  Boot:       {attempt.boot_succeeded}\n'
+		)
+		if attempt.coverage is not None:
+			content += f'  Coverage:   {(attempt.coverage * 100):.1f}%\n'
+		content += (
 			f'  Defined:    {define}\n'
 			f'  Undefined:  {undefine}\n'
 			f'  Reasoning:  {reasoning}\n'
 		)
+		return content
 
 prompt = Prompt()

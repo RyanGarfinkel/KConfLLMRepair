@@ -6,23 +6,12 @@ from src.utils import log
 import click
 import os
 
-def get_input(config: str | None = None, original: str | None = None, modified: str | None = None, patch: str | None = None, constraints: str | None = None) -> Input:
+def get_input(config: str | None = None, patch: str | None = None, constraints: str | None = None) -> Input:
 
-    patched_mode = any(v is not None for v in (original, modified, patch))
+    if config is None:
+        raise click.UsageError('Provide --config.')
 
-    if patched_mode and config is not None:
-        raise click.UsageError('Use either --config or --original/--modified/--patch, not both.')
-
-    if not patched_mode and config is None:
-        raise click.UsageError('Provide either --config or --original/--modified/--patch.')
-
-    if patched_mode and not all(v is not None for v in (original, modified, patch)):
-        raise click.UsageError('--original, --modified, and --patch must be provided.')
-
-    if patched_mode:
-        return Input(original_config=original, modified_config=modified, patch=patch, hard_constraints=constraints)
-
-    return Input(original_config=config, hard_constraints=constraints)
+    return Input(config=config, patch=patch, hard_constraints=constraints)
 
 def repair_config(input: Input, kernel_src: str):
 
@@ -35,25 +24,31 @@ def repair_config(input: Input, kernel_src: str):
 
 @click.command()
 @click.option('--config', default=None, help='Path to a configuration file to repair.')
-@click.option('--original', default=None, help='Path to the original (unmodified) config (use with --modified and --patch).')
-@click.option('--modified', default=None, help='Path to the modified config derived from --original.')
-@click.option('--patch', default=None, help='Path to the patch file that produced --modified from --original.')
+@click.option('--patch', default=None, help='Path to a patch file to track build coverage against (use with --min-coverage).')
 @click.option('--output', '-o', default=os.getcwd(), help='Path to write repair output. Defaults to current working directory.')
 @click.option('--src', default=None, help='Path to the kernel source code, otherwise set to the environment variable KERNEL_SRC.')
 @click.option('--model', '-m', default='gemini-3.1-pro-preview', help='Model name of you wish to use for repair.')
 @click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
 @click.option('--iterations', '-i', default=20, help='Maximum number of attempts to repair the configuration.')
+@click.option('--min-coverage', '-c', default=0.0, type=float, help='Minimum required patch coverage (0-1) on the resulting configuration. Requires --patch.')
 @click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
 @click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
 @click.option('--img', default=None, help='Path to the Debian root filesystem image for QEMU. Defaults to $DEBIAN_IMG env var.')
 @click.option('--constraints', default=None, help='Path to a hard constraints file.')
-def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, iterations: int, rag: bool, arch: str | None, img: str | None, constraints: str | None):
+def main(config: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, iterations: int, min_coverage: float, rag: bool, arch: str | None, img: str | None, constraints: str | None):
 
-    input = get_input(config=config, original=original, modified=modified, patch=patch, constraints=constraints)
+    input = get_input(config=config, patch=patch, constraints=constraints)
+
+    if min_coverage and not 0 <= min_coverage <= 1:
+        raise click.UsageError('--min-coverage must be between 0 and 1.')
+
+    if min_coverage and patch is None:
+        raise click.UsageError('--min-coverage requires --patch.')
 
     settings.runtime.OUTPUT_DIR = os.path.abspath(f'{output}/agent_repair')
     settings.runtime.JOBS = jobs
     settings.runtime.USE_RAG = rag
+    settings.runtime.MIN_COVERAGE = min_coverage
     settings.agent.MODEL = model
     settings.agent.MAX_ITERATIONS = iterations
 

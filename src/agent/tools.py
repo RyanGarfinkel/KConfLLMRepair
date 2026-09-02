@@ -4,6 +4,7 @@ from singleton_decorator import singleton
 from src.config import settings
 from .search import LogSearch
 from .session import Session
+import json
 import re
 import os
 
@@ -76,6 +77,23 @@ class AgentTools:
                 results.append(f'{option} not found in config.')
 
         return results
+
+    def __search_coverage(self, path: str, file_name) -> list[str]:
+        if not os.path.exists(path):
+            return [f'{path} does not exist.']
+        
+        with open(path, 'r', encoding='utf-8', errors='replace') as f:
+            data = json.load(f)
+
+        headerfile_loc = data.get('headerfile_loc', {})
+        sourcefile_loc = data.get('sourcefile_loc', {})
+
+        if file_name not in headerfile_loc and file_name not in sourcefile_loc:
+            return [f'No coverage information found for {file_name}.']
+
+        line_information = headerfile_loc.get(file_name, sourcefile_loc.get(file_name, []))
+
+        return [f'Line {line[0]} is { "INCLUDED" if line[1] == "INCLUDED" else "EXCLUDED"}' for line in line_information]
 
     def __get_rag_tools(self, session: Session) -> list[StructuredTool]:
 
@@ -348,10 +366,33 @@ class AgentTools:
 
             return results
 
+        @tool
+        def get_file_coverage(file_name: str) -> list[str]:
+            """
+            Get the coverage information for a specific file from the coverage report of the previous attempt.
+
+            Args:
+                file_name (str): The name of the file to get coverage information for.
+            Returns:
+                list[str]: A list of strings containing the coverage information for the specified file.
+            """
+            prev_attempt = session.attempts[-2]
+            results = self.__search_coverage(prev_attempt.coverage_report, file_name) if prev_attempt.coverage_report else ['No coverage report available for the previous attempt.']
+            session.attempts[-1].tool_calls.append(ToolCall(
+                name='get_file_coverage',
+                args={ 'file_name': file_name },
+                response=results,
+            ))
+
+            return results
+
         tools = [search_original_config]
 
         if prev_config is not None and prev_config != session.base:
             tools.append(search_latest_config)
+
+        if settings.runtime.MIN_COVERAGE > 0:
+            tools.append(get_file_coverage)
 
         if settings.runtime.USE_RAG:
             tools.extend(self.__get_rag_tools(session))

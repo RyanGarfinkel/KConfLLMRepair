@@ -24,23 +24,45 @@ class Session:
         return self.attempts[-1].config
     
     @property
-    def status(self) -> str:
+    def best_attempt(self) -> Attempt | None:
 
         if len(self.attempts) == 0:
+            return None
+
+        tracking = self.patch is not None and settings.runtime.MIN_COVERAGE > 0
+
+        def rank(a: Attempt) -> float:
+            return a.coverage if a.coverage is not None else -1.0
+
+        booted = [a for a in self.attempts if a.boot_succeeded == 'yes']
+        if booted:
+            return max(booted, key=rank) if tracking else booted[-1]
+
+        maintenance = [a for a in self.attempts if a.boot_succeeded == 'maintenance']
+        if maintenance:
+            return max(maintenance, key=rank) if tracking else maintenance[-1]
+
+        return self.attempts[-1]
+
+    @property
+    def status(self) -> str:
+
+        best = self.best_attempt
+
+        if best is None:
             return 'initialized'
 
         repair_attempts = len(self.attempts) - 1
-        any_maintenance = any(a.boot_succeeded == 'maintenance' for a in self.attempts)
 
-        if self.attempts[-1].boot_succeeded == 'yes':
+        if best.boot_succeeded == 'yes':
             return 'success'
-        if any_maintenance and repair_attempts >= settings.agent.MAX_ITERATIONS:
+        if best.boot_succeeded == 'maintenance' and repair_attempts >= settings.agent.MAX_ITERATIONS:
             return 'success-maintenance'
         if repair_attempts >= settings.agent.MAX_ITERATIONS:
             return 'max-attempts-reached'
-        
+
         return 'in-progress'
-    
+
     @property
     def token_usage(self) -> LLMUsage:
         return LLMUsage(
@@ -70,26 +92,22 @@ class Session:
 
     @property
     def constraints(self) -> dict:
-        if self.status == 'success':
-            attempt = next((a for a in reversed(self.attempts) if a.boot_succeeded == 'yes'), None)
-        elif self.status == 'success-maintenance':
-            attempt = next((a for a in reversed(self.attempts) if a.boot_succeeded == 'maintenance'), None)
-        else:
+        
+        best = self.best_attempt
+        if self.status not in ('success', 'success-maintenance') or best is None or not best.response:
             return {'defines': 0, 'undefines': 0, 'total': 0}
 
-        if not attempt or not attempt.response:
-            return {'defines': 0, 'undefines': 0, 'total': 0}
-
-        defines = len(attempt.response.define)
-        undefines = len(attempt.response.undefine)
+        defines = len(best.response.define)
+        undefines = len(best.response.undefine)
         return {'defines': defines, 'undefines': undefines, 'total': defines + undefines}
 
     @property
     def edits(self) -> Tuple[list[str], int] | None:
-        if self.status not in ['success', 'success-maintenance'] or not self.latest:
+        best = self.best_attempt
+        if self.status not in ('success', 'success-maintenance') or best is None or not best.config:
             return [], -1
-        
-        return diffconfig.compare(self.base, self.latest)
+
+        return diffconfig.compare(self.base, best.config)
     
     def save(self, path: str):
         with open(path, 'w', encoding='utf-8') as f:
@@ -97,26 +115,32 @@ class Session:
     
     def __dict__(self) -> dict:
 
-        repaired_config = self.latest if self.status == 'success' else None
-        maitence_config = next((attempt.config for attempt in reversed(self.attempts) if attempt.boot_succeeded == 'maintenance'), None)
-        if repaired_config is None:
-            repaired_config = maitence_config
+        best = self.best_attempt
+        repaired_config = best.config if best is not None and self.status in ('success', 'success-maintenance') else None
 
         edits, edit_distance = self.edits
 
+        summary = {
+            'status': self.status,
+            'arch': settings.kernel.ARCH,
+            'attempts': len(self.attempts) - 1,
+            'original_config': self.base,
+            'repaired_config': repaired_config,
+            'edit_distance': edit_distance,
+            'total_constraints': self.constraints['total'],
+            'total_llm_time': self.total_llm_time,
+            'total_build_time': self.total_build_time,
+            'total_boot_time': self.total_boot_time,
+        }
+
+        if self.patch is not None:
+            summary['patch'] = self.patch
+            summary['min_coverage'] = settings.runtime.MIN_COVERAGE
+            summary['initial_coverage'] = self.attempts[0].coverage if self.attempts else None
+            summary['repaired_coverage'] = best.coverage if best is not None else None
+
         return {
-            'summary': {
-                'status': self.status,
-                'arch': settings.kernel.ARCH,
-                'attempts': len(self.attempts) - 1,
-                'original_config': self.base,
-                'repaired_config': repaired_config,
-                'edit_distance': edit_distance,
-                'total_constraints': self.constraints['total'],
-                'total_llm_time': self.total_llm_time,
-                'total_build_time': self.total_build_time,
-                'total_boot_time': self.total_boot_time,
-            },
+            'summary': summary,
             'models': {
                 'llm': settings.agent.MODEL,
                 'embedding': settings.agent.EMBEDDING_MODEL if settings.runtime.USE_RAG else None,

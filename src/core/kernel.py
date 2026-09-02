@@ -1,5 +1,5 @@
-from src.models import BuildResult, BootResult, KlocalizerResult
-from src.tools import klocalizer, qemu
+from src.models import BuildResult, BootResult, KlocalizerResult, KoverageResult
+from src.tools import klocalizer, qemu, koverage
 from src.kernel import randconfig
 from src.config import settings
 from src.kernel import builder
@@ -97,10 +97,12 @@ class Kernel:
 
         start = time.time()
 
-        if patch is not None:
-            status = klocalizer.run_patch(self.src, patch, log_path, define, undefine)
-        else:
-            status = klocalizer.run(self.src, log_path, define, undefine)
+        # if patch is not None:
+        #     status = klocalizer.run_patch(self.src, patch, log_path, define, undefine)
+        # else:
+        #     status = klocalizer.run(self.src, log_path, define, undefine)
+
+        status = klocalizer.run(self.src, log_path, define, undefine)
 
         klocalizer_time = time.time() - start
 
@@ -160,6 +162,41 @@ class Kernel:
             log.error('QEMU process failed. Check log for details.')
 
         return BootResult(status=status, log=log_path, boot_time=boot_time, summary=self.__extract_boot_summary(log_path, status))
+
+    def run_koverage(self, dir: str, patch: str) -> KoverageResult:
+
+        log_path = f'{dir}/koverage.log'
+        config = f'{self.src}/.config'
+
+        if not os.path.exists(config):
+            log.error('Cannot calculate patch coverage. No configuration file found.')
+            return KoverageResult(status='error', log=log_path)
+
+        log.info('Calculating patch coverage...')
+
+        start = time.time()
+        status, coverage, coverage_report = koverage.run(self.src, config, patch, log_path)
+        koverage_time = time.time() - start
+
+        if status == 'success' and coverage is not None:
+            log.success(f'Coverage calculated: {(coverage * 100):.2f}%')
+        elif status == 'success':
+            log.warning('Coverage calculated, but patch has no coverable lines.')
+        else:
+            log.error('Koverage failed. Check log for details.')
+
+        return KoverageResult(status=status, coverage=coverage, coverage_report=coverage_report, log=log_path, koverage_time=koverage_time, summary=self.__extract_coverage_summary(status, coverage))
+
+    def __extract_coverage_summary(self, status: str, coverage: float | None) -> str | None:
+
+        if status == 'error':
+            return 'Patch coverage could not be measured (koverage failed).'
+
+        if coverage is None:
+            return 'The patch has no coverable lines under koverage.'
+
+        target_pct = settings.runtime.MIN_COVERAGE * 100
+        return f'The config covers {(coverage * 100):.1f}% of the patch (target: >{target_pct:.1f}%).'
 
     def __extract_build_summary(self, log_path: str) -> str | None:
         try:

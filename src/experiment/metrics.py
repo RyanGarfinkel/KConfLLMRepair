@@ -16,6 +16,8 @@ class SessionMetrics:
 			'attempts': summary['attempts'],
 			'edit_distance': summary['edit_distance'],
 			'llm_time': summary['total_llm_time'],
+			'initial_coverage': summary['initial_coverage'],
+			'repaired_coverage': summary['repaired_coverage'],
 			'constraints': data['constraints'],
 			'llm_token_usage': data['llm_token_usage'],
 			'embedding_token_usage': data['embedding_token_usage'],
@@ -27,9 +29,13 @@ class ExperimentMetrics:
 	def __init__(self):
 		self.__completed: list[tuple[int, dict]] = []
 
-	def record(self, i: int, data: dict, duration: float):
+	def record(self, i: int, data: dict, duration: float, original_coverage: float | None = None):
 
-		data = {**data, 'duration': duration}
+		data = {
+			**data,
+			'duration': duration,
+			'original_coverage': original_coverage,
+		}
 		self.__completed.append((i, data))
 
 		entries = [d for _, d in self.__completed]
@@ -37,6 +43,9 @@ class ExperimentMetrics:
 		sorted_entries = sorted(self.__completed, key=lambda t: t[0])
 		successes = [d for d in entries if d['status'] in ['success', 'success-maintenance']]
 		total_attempts = sum(d['attempts'] for d in entries)
+		original_coverages = [d['original_coverage'] for d in entries if d['original_coverage'] is not None]
+		initial_coverages = [d['initial_coverage'] for d in entries if d['initial_coverage'] is not None]
+		repaired_coverages = [d['repaired_coverage'] for d in entries if d['repaired_coverage'] is not None]
 
 		with open(f'{settings.runtime.OUTPUT_DIR}/results.json', 'w', encoding='utf-8') as f:
 			json.dump({
@@ -50,6 +59,9 @@ class ExperimentMetrics:
 					'avg_duration': sum(d['duration'] for d in entries) / n,
 					'avg_success_edit_distance': sum(d['edit_distance'] for d in successes) / len(successes) if successes else -1,
 					'avg_success_constraints': sum(d['constraints']['total'] for d in successes) / len(successes) if successes else -1,
+					'avg_original_coverage': sum(original_coverages) / len(original_coverages) if original_coverages else -1,
+					'avg_initial_coverage': sum(initial_coverages) / len(initial_coverages) if initial_coverages else -1,
+					'avg_repaired_coverage': sum(repaired_coverages) / len(repaired_coverages) if repaired_coverages else -1,
 				},
 				'success_rate': {
 					'5': len([d for d in entries if d['status'] == 'success' and d['attempts'] <= 5]) / n,
@@ -93,6 +105,9 @@ class ExperimentMetrics:
 						'attempts': d['attempts'],
 						'duration': d['duration'],
 						'edit_distance': d['edit_distance'],
+						'original_coverage': d['original_coverage'],
+						'initial_coverage': d['initial_coverage'],
+						'repaired_coverage': d['repaired_coverage'],
 						'constraints': d['constraints'],
 						'llm_token_usage': d['llm_token_usage'],
 						'embedding_token_usage': d['embedding_token_usage'],
