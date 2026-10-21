@@ -44,16 +44,18 @@ def repair_config(input: Input, kernel_src: str):
 @click.option('--jobs', '-j', default=8, help='Number of jobs to run when building the kernel.')
 @click.option('--iterations', '-i', default=20, help='Maximum number of attempts to repair the configuration.')
 @click.option('--rag', is_flag=True, help='Use RAG semantic search instead of grep/chunk tools.')
+@click.option('--skip-query-tools', is_flag=True, help='Disables query tools in the agent.')
 @click.option('--arch', '-a', default=None, help='Target kernel architecture (e.g. x86_64, arm64). Defaults to $ARCH env var or x86_64.')
 @click.option('--img', default=None, help='Path to the Debian root filesystem image for QEMU. Defaults to $DEBIAN_IMG env var.')
 @click.option('--constraints', default=None, help='Path to a hard constraints file.')
-def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, iterations: int, rag: bool, arch: str | None, img: str | None, constraints: str | None):
+def main(config: str | None, original: str | None, modified: str | None, patch: str | None, output: str | None, src: str | None, model: str, jobs: int, iterations: int, rag: bool, skip_query_tools: bool, arch: str | None, img: str | None, constraints: str | None):
 
     input = get_input(config=config, original=original, modified=modified, patch=patch, constraints=constraints)
 
     settings.runtime.OUTPUT_DIR = os.path.abspath(f'{output}/agent_repair')
     settings.runtime.JOBS = jobs
     settings.runtime.USE_RAG = rag
+    settings.runtime.SKIP_QUERY_TOOLS = skip_query_tools
     settings.agent.MODEL = model
     settings.agent.MAX_ITERATIONS = iterations
 

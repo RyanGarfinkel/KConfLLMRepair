@@ -39,6 +39,7 @@ class RuntimeSettings(BaseModel):
     CHUNK_WINDOW: int = 20
     CLEANUP: bool = Field(default=False)
     USE_RAG: bool = Field(default=False)
+    SKIP_QUERY_TOOLS: bool = Field(default=False)
 
     OUTPUT_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
 

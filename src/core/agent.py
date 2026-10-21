@@ -150,7 +150,7 @@ class Agent:
 
     def __generate_response(self, llm: BaseChatModel, session: Session) -> tuple[AgentResponse | None, LLMUsage, dict, bool]:
 
-        tools = agent_tools.get(session)
+        tools = [] if settings.runtime.SKIP_QUERY_TOOLS else agent_tools.get(session)
         agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
 
         response = agent.invoke({ 'messages': prompt.prompt(session) })
