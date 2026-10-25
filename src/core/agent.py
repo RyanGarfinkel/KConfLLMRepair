@@ -123,7 +123,11 @@ class Agent:
 
         define, undefine = self.__apply_hard_constraints(agent_response.define, agent_response.undefine, session.hard_define, session.hard_undefine)
 
-        klocalizer = kernel.run_klocalizer(dir, session.base, define, undefine)
+        if settings.runtime.SKIP_KREPAIR:
+            klocalizer = kernel.apply_options(dir, session.base, define, undefine)
+        else:
+            klocalizer = kernel.run_klocalizer(dir, session.base, define, undefine)
+        
         attempt.klocalizer_log = klocalizer.log
         attempt.klocalizer_status = klocalizer.status
         attempt.klocalizer_time = klocalizer.klocalizer_time

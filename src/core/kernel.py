@@ -1,5 +1,5 @@
 from src.models import BuildResult, BootResult, KlocalizerResult
-from src.tools import klocalizer, qemu
+from src.tools import klocalizer, config_editor, qemu
 from src.kernel import randconfig
 from src.config import settings
 from src.kernel import builder
@@ -112,6 +112,28 @@ class Kernel:
             log.error('KLocalizer failed.')
 
         return KlocalizerResult(status=status, log=log_path, klocalizer_time=klocalizer_time)
+
+    def apply_options(self, dir: str, config: str, define: list[str] = [], undefine: list[str] = []) -> KlocalizerResult:
+
+        log_path = f'{dir}/editor.log'
+
+        if not self.load_config(config):
+            return KlocalizerResult(status='error', log=log_path)
+
+        log.info('Applying options directly with scripts/config...')
+
+        start = time.time()
+        status = config_editor.apply(self.src, log_path, define, undefine)
+        editor_time = time.time() - start
+
+        if status == 'success':
+            log.success('Options applied successfully.')
+        elif status == 'no-satisfying-constraints':
+            log.warning('Options conflict: an option is both defined and undefined.')
+        else:
+            log.error('Applying options failed.')
+
+        return KlocalizerResult(status=status, log=log_path, klocalizer_time=editor_time)
 
     def build(self, dir: str, config: str) -> BuildResult:
 

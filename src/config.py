@@ -40,6 +40,7 @@ class RuntimeSettings(BaseModel):
     CLEANUP: bool = Field(default=False)
     USE_RAG: bool = Field(default=False)
     SKIP_QUERY_TOOLS: bool = Field(default=False)
+    SKIP_KREPAIR: bool = Field(default=False)
 
     OUTPUT_DIR: str = Field(default=os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'workspace', 'samples')))
 
@@ -114,6 +115,11 @@ class ScriptSettings(BaseModel):
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'run-klocalizer-patch.sh')
         return os.path.abspath(path)
     
+    @property
+    def APPLY_OPTIONS_SCRIPT(self) -> str:
+        path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'apply-options.sh')
+        return os.path.abspath(path)
+
     @property
     def SYZ_KCONF_SCRIPT(self) -> str:
         path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'syz-kconf.sh')
