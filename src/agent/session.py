@@ -116,6 +116,8 @@ class Session:
                 'total_llm_time': self.total_llm_time,
                 'total_build_time': self.total_build_time,
                 'total_boot_time': self.total_boot_time,
+                'skip_query_tools': settings.runtime.SKIP_QUERY_TOOLS,
+                'skip_krepair': settings.runtime.SKIP_KREPAIR,
             },
             'models': {
                 'llm': settings.agent.MODEL,

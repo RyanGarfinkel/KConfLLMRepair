@@ -123,7 +123,11 @@ class Agent:
 
         define, undefine = self.__apply_hard_constraints(agent_response.define, agent_response.undefine, session.hard_define, session.hard_undefine)
 
-        klocalizer = kernel.run_klocalizer(dir, session.base, define, undefine)
+        if settings.runtime.SKIP_KREPAIR:
+            klocalizer = kernel.apply_options(dir, session.base, define, undefine)
+        else:
+            klocalizer = kernel.run_klocalizer(dir, session.base, define, undefine)
+        
         attempt.klocalizer_log = klocalizer.log
         attempt.klocalizer_status = klocalizer.status
         attempt.klocalizer_time = klocalizer.klocalizer_time
@@ -150,7 +154,7 @@ class Agent:
 
     def __generate_response(self, llm: BaseChatModel, session: Session) -> tuple[AgentResponse | None, LLMUsage, dict, bool]:
 
-        tools = agent_tools.get(session)
+        tools = [] if settings.runtime.SKIP_QUERY_TOOLS else agent_tools.get(session)
         agent = create_agent(llm, response_format=AgentResponse, tools=tools, middleware=self.middleware)
 
         response = agent.invoke({ 'messages': prompt.prompt(session) })
