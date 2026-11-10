@@ -11,7 +11,7 @@ import time
 import sys
 import os
 
-def build_repair_cmd(sample: Sample, kernel_src: str, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str, constraints: str | None = None) -> list[str]:
+def build_repair_cmd(sample: Sample, kernel_src: str, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str, constraints: str | None = None, skip_query_tools: bool = False, skip_krepair: bool = False) -> list[str]:
 	cmd = [
 		sys.executable, '-u', '-m', 'src.cli.repair',
 		'--output', sample.sample_dir,
@@ -30,7 +30,13 @@ def build_repair_cmd(sample: Sample, kernel_src: str, model: str, jobs: int, ite
 
 	if constraints is not None:
 		cmd += ['--constraints', constraints]
-	
+
+	if skip_query_tools:
+		cmd += ['--skip-query-tools']
+
+	if skip_krepair:
+		cmd += ['--skip-krepair']
+
 	return cmd
 
 def load_samples(output_dir: str) -> list[Sample]:
@@ -39,7 +45,7 @@ def load_samples(output_dir: str) -> list[Sample]:
 	
 	return [Sample(**s) for s in data.get('samples', [])]
 
-def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str, constraints: str | None = None) -> Callable:
+def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img: str, mode: str, constraints: str | None = None, skip_query_tools: bool = False, skip_krepair: bool = False) -> Callable:
 	
 	sample_id = int(s.sample_dir.rstrip('/').split('_')[-1])
 
@@ -47,7 +53,7 @@ def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img:
 
 		start = time.time()
 		kernel_src = worktree.create(s.end_commit)
-		cmd = build_repair_cmd(s, kernel_src=kernel_src, model=model, jobs=jobs, iterations=iterations, arch=arch, img=img, mode=mode, constraints=constraints)
+		cmd = build_repair_cmd(s, kernel_src=kernel_src, model=model, jobs=jobs, iterations=iterations, arch=arch, img=img, mode=mode, constraints=constraints, skip_query_tools=skip_query_tools, skip_krepair=skip_krepair)
 		
 		log_file = f'{s.sample_dir}/terminal.log'
 		
@@ -76,8 +82,10 @@ def make_task(s: Sample, model: str, jobs: int, iterations: int, arch: str, img:
 @click.option('--patch', 'mode', flag_value='patch', help='Use patch-based samples.')
 @click.option('--random', 'mode', flag_value='random', default=True, help='Use random config samples (default).')
 @click.option('--constraints', default=None, help='Path to a hard constraints file (OPTION to define, !OPTION to undefine).')
+@click.option('--skip-query-tools', is_flag=True, help='Disables query tools in the agent.')
+@click.option('--skip-krepair', is_flag=True, help='Disables krepair after the agent runs and directly applies changes.')
 @click.option('-n', default=None, type=int, help='Number of samples to repair (default: all).')
-def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: str, constraints: str | None, n: int | None):
+def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: str, constraints: str | None, skip_query_tools: bool, skip_krepair: bool, n: int | None):
 
 	output_dir = f'{settings.runtime.OUTPUT_DIR}/{arch}'
 	settings.runtime.OUTPUT_DIR = output_dir
@@ -117,7 +125,7 @@ def main(jobs: int, threads: int, model: str, iterations: int, arch: str, mode: 
 	labels = [f'sample {int(s.sample_dir.rstrip("/").split("_")[-1])}' for s in valid]
 
 	dispatcher.run_callables(
-		tasks=[make_task(s, model, jobs, iterations, arch, img, mode, constraints) for s in valid],
+		tasks=[make_task(s, model, jobs, iterations, arch, img, mode, constraints, skip_query_tools, skip_krepair) for s in valid],
 		desc='Repairing samples',
 		labels=labels,
 	)
