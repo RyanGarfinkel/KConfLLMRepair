@@ -73,6 +73,7 @@ def main(config: str | None, original: str | None, modified: str | None, patch: 
         raise ValueError(f'Kernel source path {src} does not exist.')
 
     src = os.path.abspath(src)
+    settings.kernel.KERNEL_SRC = src
     log_settings()
     repair_config(input, src)
 

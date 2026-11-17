@@ -32,11 +32,19 @@ if [ "$ARCH" = "arm64" ]; then
         -net nic,model=virtio-net-pci \
         -nographic > "$LOG_FILE" 2>&1 &
 else
+    FS=$(od -An -tx1 -j1080 -N2 "$DEBIAN_IMG" | tr -d ' \n')
+
+    if [ "$FS" = "53ef" ]; then
+        ROOT_DEV=/dev/sda
+    else
+        ROOT_DEV=/dev/sda1
+    fi
+
     qemu-system-x86_64 \
         -m 2G \
         -smp 2 \
         -kernel "$IMG" \
-        -append "console=ttyS0 root=/dev/sda earlyprintk=serial net.ifnames=0" \
+        -append "console=ttyS0 root=$ROOT_DEV earlyprintk=serial net.ifnames=0" \
         -drive file="$DEBIAN_IMG",format=raw,file.locking=off \
         -net user,host=10.0.2.10 \
         -net nic,model=e1000 \
